@@ -1,0 +1,23 @@
+{
+  "name": "Propryo — gestion locative",
+  "short_name": "Propryo",
+  "description": "Gérer son parc locatif simplement : baux, états des lieux, loyers, quittances.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f5f8",
+  "theme_color": "#101521",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "États des lieux", "short_name": "EDL", "url": "./#p-edl" },
+    { "name": "Biens", "short_name": "Biens", "url": "./#p-biens" }
+  ]
+}

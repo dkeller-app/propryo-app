@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Propryo">
+  <!-- Marque seule (favicon) : toujours corail, identique clair/sombre. -->
+  <rect x="1.76" y="1.76" width="28.48" height="28.48" rx="7.68" fill="none" stroke="#ff5a3c" stroke-width="3.52"/>
+  <circle cx="21.34" cy="21.34" r="4.1" fill="#ff5a3c"/>
+</svg>
