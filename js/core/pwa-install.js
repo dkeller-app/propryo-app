@@ -17,6 +17,14 @@
 /** Délai avant de re-proposer après un refus (30 jours). */
 export const REPROPOSER_APRES_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Motifs d'un « pas maintenant » passager : l'invitation se représente plus tard dans la même visite.
+ * Elle n'apparaît jamais par-dessus une page plein écran (M-16 : son pied d'action collant serait recouvert)
+ * ni pendant une saisie (le champ et le clavier ont la priorité). Affichée, elle prend sa place DANS le flux,
+ * en tête d'écran : aucune action n'est jamais recouverte.
+ */
+export const MOTIFS_ATTENTE = Object.freeze(['couche-ouverte', 'saisie-en-cours']);
+
 /** Largeur au-dessus de laquelle on ne propose pas (l'enjeu est le téléphone). */
 export const LARGEUR_TELEPHONE_MAX = 767;
 
@@ -56,6 +64,8 @@ export function estInstalle({ standaloneMedia = false, navigatorStandalone = fal
  * @param {number}  [ctx.refuseA]        horodatage du dernier refus (0 = jamais)
  * @param {number}  ctx.maintenant
  * @param {boolean} [ctx.promptDisponible] un `beforeinstallprompt` a été capté
+ * @param {boolean} [ctx.coucheOuverte]  une page plein écran (couche) est ouverte
+ * @param {boolean} [ctx.saisieEnCours]  un champ de saisie a le focus
  * @returns {{afficher:boolean, mode:'ios'|'bouton'|null, motif:string}}
  */
 export function decideInvitation({
@@ -65,12 +75,16 @@ export function decideInvitation({
   refuseA = 0,
   maintenant = 0,
   promptDisponible = false,
+  coucheOuverte = false,
+  saisieEnCours = false,
 } = {}) {
   if (installe) return { afficher: false, mode: null, motif: 'deja-installe' };
   if (largeur > LARGEUR_TELEPHONE_MAX) return { afficher: false, mode: null, motif: 'pas-un-telephone' };
   if (refuseA && maintenant - refuseA < REPROPOSER_APRES_MS) {
     return { afficher: false, mode: null, motif: 'refus-recent' };
   }
+  if (coucheOuverte) return { afficher: false, mode: null, motif: 'couche-ouverte' };
+  if (saisieEnCours) return { afficher: false, mode: null, motif: 'saisie-en-cours' };
   if (plateforme === 'ios') return { afficher: true, mode: 'ios', motif: 'ios-sans-api' };
   if (promptDisponible) return { afficher: true, mode: 'bouton', motif: 'prompt-natif' };
   // Android sans prompt (déjà consommé, critères non remplis) ou navigateur tiers :

@@ -21,8 +21,9 @@ import { escHtml } from '../core/utils.js';
 //     tient SOUS le pied ; sinon il se pose JUSTE AU-DESSUS du pied. Dans les deux cas juste au-dessus
 //     de la couche (sinon il passe dessous : #ov-edl est à 1001, la feuille de style dit 999) ;
 //   - sinon, la barre du bas est affichée → au-dessus d'elle (1600) ;
-//   - dans tous ces cas, au-dessus de la bannière « Installer Propryo » si elle est affichée (#pwa-invite,
-//     1500 — elle passe aussi par-dessus la page EDL) : un message recouvert n'est pas un message dit ;
+//   - dans tous ces cas, au-dessus de la bannière « Installer Propryo » si elle a un z-index (#pwa-invite) : un
+//     message recouvert n'est pas un message dit. Depuis v15.772 elle est DANS LE FLUX en tête d'écran (z-index
+//     auto → 0) et n'apparaît jamais sur une page plein écran : la règle reste pour tout bandeau positionné ;
 //   - sinon : la place et le z-index de la feuille de style, inchangés.
 // TABLETTE (768-1023 px, pilotage 06/10) : même placement PAR COUCHE — sinon le toast (z 999) passe
 // sous la page EDL plein écran (#ov-edl, 1001) et reste invisible. Il garde sa place de la feuille de

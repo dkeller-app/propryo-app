@@ -141,7 +141,7 @@
     var entites = [
       { id: 1, nom: SCI, type: 'SCI IR', siren: '912345678', rcs: 'Mulhouse', capital: '1 000 €',
         gerants: [GERANTE], gerant: GERANTE, siege: ADR_SCI,
-        iban: 'FR76 3000 4000 1200 0012 3456 789', bic: 'BNPAFRPPXXX', emailEnvoi: '',
+        iban: 'FR76 9999 9000 1200 0012 3456 797', bic: 'DEMOFRP0XXX', emailEnvoi: '',
         irlMoisRevision: null, signature: signature(GERANTE), logo: null,
         incidentReglages: { plafondTtc: 300, parMetier: {}, conserverPieces: false, valideLe: '2026-09-02T09:30:00.000Z', validePar: '' },
         entityId: 'eid_demo_sci', members: [], driveFileId: null, driveFolderId: null,
@@ -150,7 +150,7 @@
           equipementsCommuns: { customs: [] }, syndic: null, compteursCollectifs: [], driveFolderId: null }] },
       { id: 2, nom: PERSO, type: 'Personne physique', siren: '', rcs: '', capital: '',
         gerants: [], gerant: '', siege: '5 rue des Clefs, 68000 Colmar',
-        iban: 'FR76 1027 8030 0000 0987 6543 210', bic: 'CMCIFR2AXXX', emailEnvoi: '',
+        iban: 'FR76 9999 9030 0000 0987 6543 242', bic: 'DEMOFRP0XXX', emailEnvoi: '',
         irlMoisRevision: null, signature: signature(PERSO), logo: null,
         entityId: 'eid_demo_perso', members: [], driveFileId: null, driveFolderId: null,
         immeubles: [{ id: 200, nom: IMM_PERSO, adr: '8 avenue de la République', codePostal: '68000', ville: 'Colmar',
@@ -418,8 +418,8 @@
     mv('2025-10-15', 'PRLV DGFIP TAXE FONCIERE 2025', 'Taxe foncière (et taxes annexes)', '', IMM_SCI, -1480);
     mv('2025-09-12', 'ASSURANCE PNO IMMEUBLE LES TANNEURS', 'Primes d\'assurance (PNO, GLI)', '', IMM_SCI, -418);
     mv('2026-09-12', 'ASSURANCE PNO IMMEUBLE LES TANNEURS', 'Primes d\'assurance (PNO, GLI)', '', IMM_SCI, -432);
-    mv('2026-03-18', 'PLOMBERIE DU RHIN FACT 2026-0412 D-101', 'Travaux (entretien, réparation, amélioration)', 'D-101', IMM_SCI, -650);
-    mv('2026-09-08', 'PEINTURE ALSACE DECO FACT 2026-118 D-103', 'Travaux (entretien, réparation, amélioration)', 'D-103', IMM_SCI, -940);
+    mv('2026-03-18', 'PLOMBERIE DEMO FACT 2026-0412 D-101', 'Travaux (entretien, réparation, amélioration)', 'D-101', IMM_SCI, -650);
+    mv('2026-09-08', 'PEINTURE DEMO FACT 2026-118 D-103', 'Travaux (entretien, réparation, amélioration)', 'D-103', IMM_SCI, -940);
     mv('2026-04-20', 'CABINET COMPTABLE EXPERT 68 HONORAIRES 2025', 'Frais de gestion / honoraires / comptabilité', 'SCI:' + SCI, '', -360);
     mv('2026-02-10', 'PRLV EAU MULHOUSE PARTIES COMMUNES', 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -312);
     mv('2025-02-11', 'PRLV EAU MULHOUSE PARTIES COMMUNES', 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -296);
@@ -436,7 +436,7 @@
     mv('2026-02-01', 'ASSURANCE PNO RESIDENCE DU PARC', 'Primes d\'assurance (PNO, GLI)', '', IMM_PERSO, -190);
     mv('2025-02-01', 'ASSURANCE PNO RESIDENCE DU PARC', 'Primes d\'assurance (PNO, GLI)', '', IMM_PERSO, -184);
     // Facture de l'incident « chaudière » de P-201 (circuit terminé) : la dépense existe UNE fois, rattachée à l'incident.
-    var MV_CHAUDIERE = mv('2026-05-22', 'CHAUFFAGE COLMAR SERVICES FACT F-2026-0522 P-201', 'Travaux (entretien, réparation, amélioration)', 'P-201', IMM_PERSO, -145,
+    var MV_CHAUDIERE = mv('2026-05-22', 'CHAUFFAGE DEMO FACT F-2026-0522 P-201', 'Travaux (entretien, réparation, amélioration)', 'P-201', IMM_PERSO, -145,
       { fac: 'F-2026-0522', incidentId: 4002 });
     mvts.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id; });
 
@@ -500,11 +500,11 @@
 
     // ── Carnet d'artisans (circuit d'un incident, v15.738) ───────────────────────────────────────────────────────
     var artisans = [
-      { id: 9101, entity: SCI, nom: 'Plomberie Muller', siret: '', metiers: ['plomberie'], tel: '06 00 00 20 01', email: 'contact@plomberie-muller.exemple.fr',
-        adresse: '4 rue du Sauvage', commune: 'Mulhouse', rge: false, notePrivee: 'Intervient vite, devis clairs.', prevenirAuto: true, source: 'carnet', creeLe: '2026-02-11T10:00:00.000Z' },
-      { id: 9102, entity: SCI, nom: 'Menuiserie Schmitt', siret: '', metiers: ['menuiserie'], tel: '06 00 00 20 02', email: '',
+      { id: 9101, entity: SCI, nom: 'Plomberie Démo', siret: '', metiers: ['plomberie'], tel: '06 00 00 20 01', email: 'contact@plomberie-demo.exemple.fr',
+        adresse: '4 rue de la Démo', commune: 'Mulhouse', rge: false, notePrivee: 'Intervient vite, devis clairs.', prevenirAuto: true, source: 'carnet', creeLe: '2026-02-11T10:00:00.000Z' },
+      { id: 9102, entity: SCI, nom: 'Menuiserie Démo', siret: '', metiers: ['menuiserie'], tel: '06 00 00 20 02', email: '',
         adresse: '', commune: 'Mulhouse', rge: false, notePrivee: '', prevenirAuto: true, source: 'carnet', creeLe: '2026-02-11T10:05:00.000Z' },
-      { id: 9103, entity: PERSO, nom: 'Chauffage Colmar Services', siret: '', metiers: ['chauffage'], tel: '06 00 00 20 03', email: 'atelier@chauffage-colmar.exemple.fr',
+      { id: 9103, entity: PERSO, nom: 'Chauffage Démo', siret: '', metiers: ['chauffage'], tel: '06 00 00 20 03', email: 'atelier@chauffage-demo.exemple.fr',
         adresse: '', commune: 'Colmar', rge: true, notePrivee: '', prevenirAuto: true, source: 'carnet', creeLe: '2025-11-03T10:00:00.000Z' }
     ];
 
@@ -519,7 +519,7 @@
         description: 'Fuite sous l\'évier de la cuisine : le meuble est mouillé chaque matin, un seau est posé dessous.',
         contexte: { meuble: null, partieCommune: false, copro: null, clauseChaudiereBailleur: false },
         statut: 'en_cours', statutDates: { signale: '2026-09-29T07:55:00.000Z', en_cours: '2026-09-29T09:10:00.000Z' },
-        verdict: null, payeurRetenu: null, artisan: { nom: 'Plomberie Muller', siret: '', tel: '06 00 00 20 01', source: 'carnet', metier: 'plomberie' },
+        verdict: null, payeurRetenu: null, artisan: { nom: 'Plomberie Démo', siret: '', tel: '06 00 00 20 01', source: 'carnet', metier: 'plomberie' },
         assurance: { checklist: {} }, mouvementIds: [], ia: null, espaceSignalementId: U.sigD101, espaceAccesId: U.acD101, vu: true,
         circuit: { artisanId: 9101, metier: 'plomberie', plafondTtc: 300, accesId: U.arD101, emisLe: '2026-09-29T09:10:00.000Z', factureNumero: null } },
       // Terminé : constat de l'artisan → verdict du moteur (calculé au démarrage par demo-app.js, règles inchangées),
@@ -529,14 +529,14 @@
         description: 'Plus d\'eau chaude depuis ce matin, la chaudière affiche un code erreur.',
         contexte: { meuble: null, partieCommune: false, copro: null, clauseChaudiereBailleur: false },
         statut: 'resolu', statutDates: { signale: '2026-05-19T06:40:00.000Z', en_cours: '2026-05-19T08:05:00.000Z', resolu: '2026-05-22T16:30:00.000Z' },
-        verdict: null, payeurRetenu: null, artisan: { nom: 'Chauffage Colmar Services', siret: '', tel: '06 00 00 20 03', source: 'carnet', metier: 'chauffage' },
+        verdict: null, payeurRetenu: null, artisan: { nom: 'Chauffage Démo', siret: '', tel: '06 00 00 20 03', source: 'carnet', metier: 'chauffage' },
         assurance: { checklist: {} }, mouvementIds: [MV_CHAUDIERE.id], ia: null, espaceSignalementId: U.sigP201, espaceAccesId: U.acP201a, vu: true,
         circuit: { artisanId: 9103, metier: 'chauffage', plafondTtc: 300, accesId: U.arP201, emisLe: '2026-05-19T08:05:00.000Z', factureNumero: 'F-2026-0522' },
         constat: { constat: 'defaut', sousType: null, ampleur: 'petite', resume: 'Carte électronique de la chaudière défectueuse, remplacée.', source: 'artisan', le: '2026-05-22T15:10:00.000Z' },
         valideLe: '2026-05-22T16:30:00.000Z', resultatPublieLe: '2026-05-22T16:30:00.000Z' }
     ];
-    fichiers.demo_nuage_devis = pdfUnePage('Devis D-2026-118 - Plomberie Muller', 'Remplacement du siphon et des joints sous evier - 185,00 EUR TTC');
-    fichiers.demo_nuage_facture = pdfUnePage('Facture F-2026-0522 - Chauffage Colmar Services', 'Carte electronique chaudiere remplacee - 145,00 EUR TTC');
+    fichiers.demo_nuage_devis = pdfUnePage('Devis D-2026-118 - Plomberie Demo', 'Remplacement du siphon et des joints sous evier - 185,00 EUR TTC');
+    fichiers.demo_nuage_facture = pdfUnePage('Facture F-2026-0522 - Chauffage Demo', 'Carte electronique chaudiere remplacee - 145,00 EUR TTC');
 
     // ── Nuage FICTIF (semé par js/app/demo-app.js, local seulement) ──────────────────────────────────────────────
     // Accès à l'espace locataire, messages, signalements, liens et dépôts des artisans. Les identifiants de bail
@@ -552,7 +552,7 @@
         { id: U.acD104, ref: 'D-104', rang: 0, nom: 'Lucas Petit', emis_le: '2026-04-02T17:20:00.000Z', derniere_visite: '2026-10-05T07:40:00.000Z' }
       ],
       messages: [
-        { acces: U.acD101, auteur: 'bailleur', corps: 'Bonjour, la société Plomberie Muller passe jeudi 8 octobre entre 17 h et 18 h pour la fuite sous l\'évier.', cree_le: '2026-09-30T08:15:00.000Z', lu: true },
+        { acces: U.acD101, auteur: 'bailleur', corps: 'Bonjour, la société Plomberie Démo passe jeudi 8 octobre entre 17 h et 18 h pour la fuite sous l\'évier.', cree_le: '2026-09-30T08:15:00.000Z', lu: true },
         { acces: U.acD101, auteur: 'locataire', corps: 'Bonjour, c\'est noté pour jeudi, présence assurée. La quittance de septembre est bien dans l\'espace, merci.', cree_le: '2026-10-04T19:14:00.000Z', lu: false },
         { acces: U.acP201a, auteur: 'locataire', corps: 'Eau chaude revenue, merci pour la rapidité.', cree_le: '2026-05-22T19:02:00.000Z', lu: true }
       ],
@@ -568,10 +568,10 @@
           ia: { resume: 'Volet roulant de la chambre bloqué à mi-hauteur.', element: 'volet', nature: 'casse', urgences: [] } }
       ],
       artisanAcces: [
-        { id: U.arD101, incident: '4001', signalement: U.sigD101, artisan_nom: 'Plomberie Muller', artisan_email: 'contact@plomberie-muller.exemple.fr', artisan_tel: '06 00 00 20 01',
+        { id: U.arD101, incident: '4001', signalement: U.sigD101, artisan_nom: 'Plomberie Démo', artisan_email: 'contact@plomberie-demo.exemple.fr', artisan_tel: '06 00 00 20 01',
           metier: 'plomberie', plafond_ttc: 300, emis_le: '2026-09-29T09:10:00.000Z', derniere_visite: '2026-09-30T07:48:00.000Z',
           creneau_date: '2026-10-08', creneau_debut: '17:00:00', creneau_fin: '18:00:00', creneau_confirme_le: '2026-09-30T12:20:00.000Z', creneau_accord_expres: true },
-        { id: U.arP201, incident: '4002', signalement: U.sigP201, artisan_nom: 'Chauffage Colmar Services', artisan_email: 'atelier@chauffage-colmar.exemple.fr', artisan_tel: '06 00 00 20 03',
+        { id: U.arP201, incident: '4002', signalement: U.sigP201, artisan_nom: 'Chauffage Démo', artisan_email: 'atelier@chauffage-demo.exemple.fr', artisan_tel: '06 00 00 20 03',
           metier: 'chauffage', plafond_ttc: 300, emis_le: '2026-05-19T08:05:00.000Z', derniere_visite: '2026-05-22T15:12:00.000Z', valide_le: '2026-05-22T16:30:00.000Z',
           creneau_date: '2026-05-20', creneau_debut: '08:00:00', creneau_fin: '10:00:00', creneau_confirme_le: '2026-05-19T09:00:00.000Z', creneau_accord_expres: true,
           constat: 'defaut', constat_ampleur: 'petite', constat_resume: 'Carte électronique de la chaudière défectueuse, remplacée.', constat_le: '2026-05-22T15:10:00.000Z' }

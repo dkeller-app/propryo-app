@@ -1030,7 +1030,9 @@ window.addEventListener('storage', (e) => {
 // bandeau et le branchement navigateur.
 const PWA_REFUS_KEY = 'propryo_pwa_refus';
 let _pwaPrompt = null;          // l'événement Android, s'il est offert
-let _pwaEssais = 0;
+let _pwaEssais = 0;             // app encore derrière l'écran de connexion
+let _pwaAttentes = 0;           // page plein écran ouverte / saisie en cours : on repasse plus tard
+let _pwaMinuterie = null;       // une seule relance en attente (load ET beforeinstallprompt appellent _pwaInviter)
 
 /** Le navigateur propose l'installation : on garde la main pour la proposer AU BON MOMENT. */
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -1048,11 +1050,37 @@ function _pwaAppVisible() {
   return true;
 }
 
+/** Une page plein écran est-elle ouverte ? Mêmes couches que le placement du toast (js/components/toast.js),
+ *  plus l'assistant de signature. */
+function _pwaCoucheOuverte() {
+  for (const n of document.querySelectorAll('.ov:not(.hidden), .edl-page.edl-lpage, #wizV2-overlay')) {
+    const c = getComputedStyle(n);
+    if (c.display !== 'none' && c.visibility !== 'hidden') return true;
+  }
+  return false;
+}
+
+/** Un champ de saisie a-t-il le focus ? (cases, boutons et curseurs ne sont pas une saisie) */
+function _pwaSaisieEnCours() {
+  const a = document.activeElement;
+  if (!a || a === document.body || a === document.documentElement) return false;
+  if (a.isContentEditable) return true;
+  const t = String(a.tagName || '').toLowerCase();
+  if (t === 'textarea' || t === 'select') return true;
+  if (t === 'input') return !/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(a.type || 'text');
+  return false;
+}
+
+function _pwaRelancer(ms) {
+  if (_pwaMinuterie) clearTimeout(_pwaMinuterie);
+  _pwaMinuterie = setTimeout(() => { _pwaMinuterie = null; _pwaInviter(); }, ms);
+}
+
 function _pwaInviter() {
   const M = (typeof window !== 'undefined') ? window.PwaInstall : null;
   if (!M) return;
   if (!_pwaAppVisible()) {
-    if (_pwaEssais++ < 6) setTimeout(_pwaInviter, 5000);
+    if (_pwaEssais++ < 6) _pwaRelancer(5000);
     return;
   }
   if (document.getElementById('pwa-invite')) return;
@@ -1068,23 +1096,34 @@ function _pwaInviter() {
     plateforme: M.detectPlateforme(navigator.userAgent, navigator.maxTouchPoints || 0),
     refuseA,
     maintenant: Date.now(),
-    promptDisponible: !!_pwaPrompt
+    promptDisponible: !!_pwaPrompt,
+    coucheOuverte: _pwaCoucheOuverte(),
+    saisieEnCours: _pwaSaisieEnCours()
   });
-  if (!d.afficher) return;
+  if (!d.afficher) {
+    // Page plein écran ouverte ou saisie en cours : pas maintenant, on repasse (≈ 10 min au plus dans la visite).
+    if ((M.MOTIFS_ATTENTE || []).indexOf(d.motif) >= 0 && _pwaAttentes++ < 150) _pwaRelancer(4000);
+    return;
+  }
   const t = M.texteInvitation(d.mode);
+  // Bandeau DANS LE FLUX en tête d'écran, déclaré à _v4SyncBannersHeight (comme le bandeau hors ligne) : .layout
+  // prend la hauteur restante, le bandeau ne recouvre donc jamais une action ni un pied collant. Aucun bouton
+  // corail : l'écran garde son unique action primaire (M-4) ; « Installer » est un bouton secondaire.
   const box = document.createElement('div');
   box.id = 'pwa-invite';
   box.className = 'pwa-invite';
-  box.setAttribute('role', 'dialog');
+  box.setAttribute('role', 'region');
   box.setAttribute('aria-label', t.titre);
   box.innerHTML =
     '<div class="pwa-invite-txt"><strong>' + escHtml(t.titre) + '</strong>'
     + '<span>' + escHtml(t.corps) + '</span></div>'
     + '<div class="pwa-invite-act">'
-    + (t.action ? '<button type="button" class="btn bp" id="pwa-invite-go">' + escHtml(t.action) + '</button>' : '')
-    + '<button type="button" class="btn bs" id="pwa-invite-no">Plus tard</button>'
+    + '<button type="button" class="btn pwa-invite-no" id="pwa-invite-no">Plus tard</button>'
+    + (t.action ? '<button type="button" class="btn bs pwa-invite-go" id="pwa-invite-go">' + escHtml(t.action) + '</button>' : '')
     + '</div>';
-  document.body.appendChild(box);
+  const layout = document.querySelector('body > .layout');
+  if (layout) document.body.insertBefore(box, layout); else document.body.insertBefore(box, document.body.firstChild);
+  try { if (typeof _v4SyncBannersHeight === 'function') _v4SyncBannersHeight(); } catch (_) {}
   const no = document.getElementById('pwa-invite-no');
   if (no) no.onclick = () => _pwaFermer(true);
   const go2 = document.getElementById('pwa-invite-go');
@@ -1100,6 +1139,7 @@ function _pwaInviter() {
 function _pwaFermer(refus) {
   const b = document.getElementById('pwa-invite');
   if (b) b.remove();
+  try { if (typeof _v4SyncBannersHeight === 'function') _v4SyncBannersHeight(); } catch (_) {}
   if (refus) { try { localStorage.setItem(PWA_REFUS_KEY, String(Date.now())); } catch (_) {} }
 }
 

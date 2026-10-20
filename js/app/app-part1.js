@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.769';
+const IMMOTRACK_VERSION = '15.770';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -259,7 +259,22 @@ function _injectDemoBanner() {
     + '#sandbox-banner.demo-banner button{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:3px 11px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;opacity:.9}'
     + '#sandbox-banner.demo-banner button:hover{opacity:1}'
     + '@media (pointer:coarse),(max-width:767px){#sandbox-banner.demo-banner button{min-height:44px}}'
-    + '@media (max-width:480px){#sandbox-banner.demo-banner .demo-sub{display:none}}';   // téléphone : une seule ligne
+    + '@media (max-width:480px){#sandbox-banner.demo-banner .demo-sub{display:none}}'   // téléphone : une seule ligne
+    // Le bandeau est FIXE tout en haut, au-dessus de tout (z 99999) : il DÉCALE les couches plein écran au lieu de
+    // recouvrir leur titre (M-16 : barre du haut ← retour + titre toujours visible). --demo-h = sa hauteur mesurée
+    // (ResizeObserver plus bas). Couches de la feuille de style, couches posées en style en ligne (sélecteurs de
+    // catégorie, visionneuses) ; les couches au-dessus du bandeau (feuille de signature, page de dépôt du DDT) le
+    // recouvrent, elles, entièrement : rien à décaler. Style présent en démonstration SEULEMENT (?demo=1).
+    + '.ov,.edl-page.edl-lpage,#more-ov,#sb-backdrop.open,.edl-piece-sheet,.edl-signmodal,#edl-photo-viewer,.pp-ov,#bkr-ov,#bkr-progress,.edl-consult-ov,#ov-menu-perso,#ov-fav-picker,#pil-layer .scrim,#pil-layer .shw,#wizV2-overlay,'
+    + 'body>[style*="position:fixed;inset:0"],body>[style*="position: fixed; inset: 0"]{top:var(--demo-h,0px) !important}'
+    // Téléphone : la couche et sa page faisaient 100 % de la hauteur → hauteur restante sous le bandeau (sinon le pied
+    // d'action collant sortirait de l'écran de la hauteur du bandeau).
+    // Tiroir latéral : fixe au téléphone seulement (≤ 768) ; sur PC/tablette il est dans .layout, déjà décalé.
+    + '@media (max-width:768px){#sb{top:var(--demo-h,0px) !important;height:calc(100% - var(--demo-h,0px)) !important}}'
+    + '@media (max-width:767px){.ov{min-height:calc(100dvh - var(--demo-h,0px)) !important;max-height:calc(100dvh - var(--demo-h,0px)) !important}'
+    + '.ov .modal{min-height:calc(100dvh - var(--demo-h,0px)) !important;max-height:calc(100dvh - var(--demo-h,0px)) !important;height:calc(100dvh - var(--demo-h,0px)) !important}'
+    + '.edl-consult-card{min-height:calc(100vh - var(--demo-h,0px))}}'
+    + '@media (max-width:1023px){#ov-edl>.modal{max-height:calc(100dvh - var(--demo-h,0px)) !important;height:calc(100dvh - var(--demo-h,0px)) !important}}';
   document.head.appendChild(st);
   const div = document.createElement('div');
   div.id = 'sandbox-banner';
@@ -268,7 +283,17 @@ function _injectDemoBanner() {
   div.innerHTML = '<span><span class="demo-dot" aria-hidden="true"></span>Démonstration<span class="demo-sub"> : données fictives, rien n\'est envoyé</span></span>'
     + '<button type="button" id="demo-reload"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>Recharger la démo</button>';
   document.body.appendChild(div);
-  document.body.style.paddingTop = (parseFloat(getComputedStyle(document.body).paddingTop)||0) + div.offsetHeight + 'px';
+  // Hauteur du bandeau → décalage du document (padding du <body>) ET des couches plein écran (--demo-h). Re-mesurée
+  // quand le bandeau change de hauteur (rotation, passage sur une ou deux lignes).
+  const padBase = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+  const mesurer = () => {
+    const h = div.offsetHeight || 0;
+    document.body.style.paddingTop = (padBase + h) + 'px';
+    document.documentElement.style.setProperty('--demo-h', h + 'px');
+  };
+  mesurer();
+  try { new ResizeObserver(() => { mesurer(); try { _v4SyncBannersHeight(); } catch(e){} }).observe(div); }
+  catch(e) { window.addEventListener('resize', mesurer); }
   const rb = document.getElementById('demo-reload');
   if (rb) rb.addEventListener('click', () => {
     if (!confirm('Recharger la démo ?\nToutes les modifications faites pendant la démonstration seront effacées.')) return;
@@ -2589,7 +2614,7 @@ function _inEditableField(target) {
 /* v14.22 UNDO-OP Phase 2 : helper toast post-action critique avec bouton "↶ Annuler" inline.
    Utilisé par les wrappers _undoOp dans les ~11 fonctions delX (cf Phase 3). */
 function _undoToast(message, type) {
-  const btnHtml = ' <button onclick="_undoUndo()" style="margin-left:10px;background:var(--acc);color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-weight:600;font-size:12px">↶ Annuler</button>';
+  const btnHtml = ' <button onclick="_undoUndo()" style="margin-left:10px;background:var(--acc);color:var(--cta-text,#fff);border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-weight:600;font-size:12px">↶ Annuler</button>';
   showToast(message, type || 'ok', 8000, btnHtml);
 }
 
@@ -6875,7 +6900,8 @@ function _initSidebarV2() {
 // était recopiée ici et dans le MutationObserver plus bas, et une seule des deux
 // copies aurait été mise à jour (EDL TERRAIN lot 4 ajoute 'hl-bar', le bandeau
 // hors ligne — sans quoi .layout garde 100vh et le bandeau recouvre l'app).
-const _V4_TOP_BANNERS = ['sandbox-banner', 'readonly-banner', 'hl-bar'];
+// 'pwa-invite' : l'invitation « Installer Propryo » (téléphone) entre elle aussi dans le flux en tête d'écran.
+const _V4_TOP_BANNERS = ['sandbox-banner', 'readonly-banner', 'hl-bar', 'pwa-invite'];
 function _v4SyncBannersHeight() {
   let h = 0;
   _V4_TOP_BANNERS.forEach(id => {
@@ -7842,7 +7868,7 @@ function _accmShowAregarder(){
       +'.atr .ic{width:38px;height:38px;border-radius:11px;background:var(--acc-soft);display:grid;place-items:center;flex:0 0 auto}'
       +'.atr .ic svg{width:19px;height:19px;stroke:var(--acc);fill:none;stroke-width:1.8}'
       +'.atr .m{flex:1;min-width:0}.atr .m .t{display:block;font-weight:700;color:var(--t1);font-size:14px}.atr .m .s{display:block;font-size:12px;color:var(--t3);margin-top:2px;overflow-wrap:anywhere}'
-      +'.atr .cnt{min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:var(--acc);color:#fff;font-weight:800;font-size:12px;display:grid;place-items:center;flex:0 0 auto}'
+      +'.atr .cnt{min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:var(--acc);color:var(--cta-text,#fff);font-weight:800;font-size:12px;display:grid;place-items:center;flex:0 0 auto}'
       +'.atr .chev{width:16px;height:16px;stroke:var(--t3);fill:none;stroke-width:1.8;flex:0 0 auto}'
       +'.atl .empty{padding:34px 12px;text-align:center;color:var(--pos);font-weight:700}'
       +'.atl-st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--t2);margin:6px 2px 9px}.atl-st span{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t3)}'
@@ -8063,7 +8089,7 @@ function _renderAccueilPhone(ctx){
   +'.accm .watch .m{flex:1;min-width:0}'
   +'.accm .watch .m .t{display:block;font-weight:800;font-family:var(--ff-display,\'Schibsted Grotesk\',\'Inter\',sans-serif);color:var(--t1);font-size:15.5px}'
   +'.accm .watch .m .s{display:block;font-size:12px;color:var(--t3);margin-top:2px;line-height:1.3}'
-  +'.accm .watch .cnt{min-width:25px;height:25px;padding:0 8px;border-radius:999px;background:var(--acc);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center;flex:0 0 auto}'
+  +'.accm .watch .cnt{min-width:25px;height:25px;padding:0 8px;border-radius:999px;background:var(--acc);color:var(--cta-text,#fff);font-weight:800;font-size:13px;display:grid;place-items:center;flex:0 0 auto}'
   +'.accm .watch .chev{width:17px;height:17px;stroke:var(--t3);fill:none;stroke-width:1.8;flex:0 0 auto}'
   +'</style>'
   +'<div class="accm">'
@@ -20649,12 +20675,12 @@ function previewBailData(bail, log, ref, opts) {
     +'.pz-pgnum{margin-left:auto;font-size:8pt;color:#ccc;white-space:nowrap;flex-shrink:0}'
     +'.btn-x{font-size:7.5pt;border:none;background:none;cursor:pointer;color:#c00;padding:0;line-height:1}'
     /* === Phase polish v12.60 — Mode wizard signature page par page === */
-    +'#toolbar .btn-wiz{background:#ff5a3c;color:#fff}' /* FIL-ROUGE restyle : corail Propryo */
+    +'#toolbar .btn-wiz{background:#ff5a3c;color:var(--cta-text,#fff)}' /* FIL-ROUGE restyle : corail Propryo */
     +'#toolbar .wiz-counter{display:none;align-items:center;padding:4px 10px;background:rgba(255,255,255,.25);border-radius:12px;font-size:11px;font-weight:bold;margin-right:auto}'
     +'.wiz-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #ccc;padding:10px 14px;display:none;gap:8px;z-index:9998;box-shadow:0 -2px 12px rgba(0,0,0,.15)}'
     +'.wiz-nav button{flex:1;min-height:48px;border:none;border-radius:6px;font-size:14pt;font-weight:bold;cursor:pointer;font-family:inherit}'
     +'.wiz-nav .wiz-prev{background:#e0e0e0;color:#333;flex:0 1 35%}'
-    +'.wiz-nav .wiz-next{background:#ff5a3c;color:#fff}' /* FIL-ROUGE restyle : corail Propryo */
+    +'.wiz-nav .wiz-next{background:#ff5a3c;color:var(--cta-text,#fff)}' /* FIL-ROUGE restyle : corail Propryo */
     +'.wiz-nav .wiz-next:disabled{background:#aaa;cursor:not-allowed}'
     +'body.wizard-mode .wiz-nav{display:flex}'  /* hotfix v12.62 — règle manquante au commit 2 */
     /* En mode wizard : 1 page A4 plein écran, paraphes mis en valeur */
@@ -20722,7 +20748,7 @@ function previewBailData(bail, log, ref, opts) {
     +'.wizV2-sheet-pad{max-width:100%!important;height:150px!important}'
     +'.wizV2-sheet-hint{font-size:12.5px!important;color:#5f6f86!important;margin-top:8px!important}'
     +'.wizV2-sheet-foot{display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #e4e7ee}'
-    +'.wizV2-sheet-ok{flex:1;min-height:46px;border:0;border-radius:9px;background:#ff5a3c;color:#fff;font-size:15px;font-weight:800;cursor:pointer}'
+    +'.wizV2-sheet-ok{flex:1;min-height:46px;border:0;border-radius:9px;background:#ff5a3c;color:var(--cta-text,#fff);font-size:15px;font-weight:800;cursor:pointer}'
     /* Écran « Annexes au bail » (avant la signature finale d'un locataire présent) */
     +'.wizV2-ann-lead{font-size:14.5px;color:#3c4658;margin:0 0 12px}'
     +'.wizV2-ann-list{border:1px solid #e4e7ee;border-radius:10px;padding:4px 12px;margin:0 0 14px}'
