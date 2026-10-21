@@ -8,7 +8,7 @@
     --ink:#101521; --ink-2:#3c4658; --ink-3:#5f6f86; /* v15.694 CHARTE M-17 : #6e7888 (4,09) → 4,69:1 sur --bg */
     --line:#e4e7ee; --line-2:#eef0f5;
     --neutral-soft:#eef1f6; --neutral-ink:#42506a;
-    --accent:#ff5a3c; --accent-2:#e8431f; --accent-soft:#ffe7e0; --accent-on:#ffffff;
+    --accent:#ff5a3c; --accent-2:#e8431f; --accent-soft:#ffe7e0; --accent-on:#101521;
     --good:#1a8f6f; --good-soft:#dff3ec; --warn:#b27a12; --warn-soft:#f8eed6; --bad:#d23f3f; --bad-soft:#fbe4e2; --stars:#f0a13c;
     --font:'Inter',system-ui,sans-serif;
     --display:'Schibsted Grotesk','Inter',system-ui,sans-serif;

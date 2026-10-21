@@ -127,7 +127,7 @@
   /* CTA — descendus des thèmes (écart d3) */
   --cta:#ff5a3c;
   --cta-h:#e8431f;
-  --cta-text:#FFFFFF;
+  --cta-text:#101521; /* 21/10 (Didier) : texte sur corail = encre en clair aussi (5,89:1 ; blanc = 3,10:1) */
   --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 18px rgba(0,0,0,.07);
   --shadow-lg:0 8px 40px rgba(0,0,0,.13),0 2px 8px rgba(0,0,0,.07);
   --shadow-hover:0 4px 20px rgba(255,90,60,.16),0 1px 4px rgba(0,0,0,.07);
@@ -206,7 +206,7 @@
   --acc-soft:#ffe7e0;
   --cta:#ff5a3c;
   --cta-h:#e8431f;
-  --cta-text:#FFFFFF;
+  --cta-text:#101521; /* 21/10 (Didier) : texte sur corail = encre en clair aussi (5,89:1 ; blanc = 3,10:1) */
   /* Palette sémantique calibrée le 18/08 (CDC-DESIGN-FINANCES §1.2, option 1) */
   --pos:#16795e;
   --pos-soft:rgba(22,121,94,.10);
@@ -264,7 +264,7 @@
   --acc-soft:#ffe7e0;
   --cta:#ff5a3c;
   --cta-h:#e8431f;
-  --cta-text:#FFFFFF;
+  --cta-text:#101521; /* 21/10 (Didier) : texte sur corail = encre en clair aussi (5,89:1 ; blanc = 3,10:1) */
   /* Palette sémantique calibrée le 18/08 (CDC-DESIGN-FINANCES §1.2, option 1) */
   --pos:#16795e;
   --pos-soft:rgba(22,121,94,.10);
@@ -790,7 +790,7 @@ button .uic:only-child, .btn .uic:only-child{margin-right:0}
   font-family:var(--font);
 }
 .btn:disabled{opacity:.38;cursor:not-allowed}
-.bp{background:var(--acc);color:var(--cta-text,#fff);box-shadow:0 2px 8px rgba(255,90,60,.3)}
+.bp{background:var(--acc);color:var(--cta-text,#101521);box-shadow:0 2px 8px rgba(255,90,60,.3)}
 .bp:hover:not(:disabled){background:var(--acc);box-shadow:0 4px 14px rgba(255,90,60,.4)}
 .bs{background:var(--sur2);color:var(--t1);border:1px solid var(--bor)}
 .bs:hover:not(:disabled){background:var(--sur3);border-color:var(--acc)}
@@ -938,7 +938,7 @@ button .uic:only-child, .btn .uic:only-child{margin-right:0}
 .biens-filter-btn:hover{border-color:var(--acc);color:var(--acc)}
 .biens-filter-btn.has-active{border-color:var(--acc);color:var(--acc);background:rgba(255,90,60,.06)}
 .biens-filter-btn-badge{
-  background:var(--acc);color:var(--cta-text,#fff);font-size:10px;font-weight:700;
+  background:var(--acc);color:var(--cta-text,#101521);font-size:10px;font-weight:700;
   padding:1px 6px;border-radius:9px;line-height:1.4;min-width:14px;text-align:center;
 }
 .biens-popover{
@@ -1500,7 +1500,7 @@ button .uic:only-child, .btn .uic:only-child{margin-right:0}
   background:var(--sur);border:none;padding:5px 14px;font-size:12.5px;font-weight:600;
   color:var(--t2);cursor:pointer;font-family:var(--font);
 }
-.immf-vue-btn.act{background:var(--acc);color:var(--cta-text,#fff)}
+.immf-vue-btn.act{background:var(--acc);color:var(--cta-text,#101521)}
 .logf-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .logf-panel{
   background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);
@@ -2825,7 +2825,7 @@ textarea.field-modified-since-sig{
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   /* Bouton ✏️ Modifier en pleine largeur (action principale) */
-  #p-edl .tbl tr td.act-cell .btn:nth-child(1){grid-column:1 / -1;background:var(--acc);color:var(--cta-text,#fff)}
+  #p-edl .tbl tr td.act-cell .btn:nth-child(1){grid-column:1 / -1;background:var(--acc);color:var(--cta-text,#101521)}
   /* Bouton 🗑 supprimer dernier en bordure pointillée */
   #p-edl .tbl tr td.act-cell .btn.br{border-style:dashed}
   /* État vide : recentrer */
@@ -3511,13 +3511,13 @@ textarea.field-modified-since-sig{
 /* Bouton de finalisation sur l'étape « fin » — MOBILE only (le pied de page « Enregistrer »
    est masqué sur téléphone). Termine l'état des lieux (saveEDL). */
 /* #3 (26/08) — sur relecture / fin, le CENTRE DU RAIL devient le bouton d'ACTION (place
-   cohérente, plus de bouton flottant dans le corps). Rempli, texte blanc. */
+   cohérente, plus de bouton flottant dans le corps). Rempli ; texte = --cta-text sur corail (encre, 21/10), --sur sur vert. */
 .edl-rail-mid.rail-act-sign{background:var(--acc);border-color:var(--acc)}
 .edl-rail-mid.rail-act-save{background:var(--pos);border-color:var(--pos)}
 .edl-rail-mid.rail-act-sign .edl-rail-label,
+.edl-rail-mid.rail-act-sign .edl-rail-jump{color:var(--cta-text)}
 .edl-rail-mid.rail-act-save .edl-rail-label,
-.edl-rail-mid.rail-act-sign .edl-rail-jump,
-.edl-rail-mid.rail-act-save .edl-rail-jump{color:#fff}
+.edl-rail-mid.rail-act-save .edl-rail-jump{color:var(--sur)}
 
 /* Bouton « ✕ » de suppression d'une photo : un ROND propre. La cible tactile mobile
    (min-height:44px) l'étirait en ellipse verticale (15×44). Dimensions forcées + centrage. */
@@ -4764,7 +4764,7 @@ textarea.field-modified-since-sig{
 .agenda-act{padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:1px solid var(--bor);background:var(--sur);color:var(--t1);min-height:34px}
 .agenda-act svg{width:14px;height:14px}
 .agenda-act-done{border-color:var(--acc);color:var(--acc)}
-.agenda-act-done:hover{background:var(--acc);color:var(--cta-text,#fff)}
+.agenda-act-done:hover{background:var(--acc);color:var(--cta-text,#101521)}
 .agenda-act-del:hover{background:var(--red);color:#fff;border-color:var(--red)}
 .agenda-card-title{font-size:14px;font-weight:600;color:var(--t1);margin-bottom:5px}
 .agenda-card-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--t2)}
@@ -4782,7 +4782,7 @@ textarea.field-modified-since-sig{
 .agenda-cal-today{background:var(--acc-bg)!important}
 .agenda-cal-day-num{font-size:12.5px;font-weight:600;color:var(--t2);display:block;margin-bottom:4px}
 .agenda-cal-day-num.today{
-  width:22px;height:22px;border-radius:50%;background:var(--acc);color:var(--cta-text,#fff);
+  width:22px;height:22px;border-radius:50%;background:var(--acc);color:var(--cta-text,#101521);
   display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;
 }
 .agenda-cal-evt{
@@ -5246,7 +5246,7 @@ textarea.field-modified-since-sig{
 }
 .hero-v2:hover .hero-v2-drill-ind {
   background: var(--acc);
-  color: var(--cta-text,#fff);
+  color: var(--cta-text,#101521);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -5309,7 +5309,7 @@ textarea.field-modified-since-sig{
 }
 .todo-v2:hover .todo-v2-drill-ind {
   background: var(--acc);
-  color: var(--cta-text,#fff);
+  color: var(--cta-text,#101521);
 }
 /* v15.34 — Vue lignes compactes par THÈME (utilisée par _todoV2 actuel) */
 .todo-v2-rows {
@@ -5862,7 +5862,7 @@ textarea.field-modified-since-sig{
 }
 .cockpit-v4:hover .cv4-drill {
   background: var(--acc, var(--fg-info));
-  color: var(--cta-text,#fff);
+  color: var(--cta-text,#101521);
 }
 @media (max-width: 1024px) {
   .cv4-sats { grid-template-columns: repeat(2, 1fr); }
@@ -6111,7 +6111,7 @@ textarea.field-modified-since-sig{
 }
 .cockpit-v2:hover .cockpit-drill-ind {
   background: var(--acc);
-  color: var(--cta-text,#fff);
+  color: var(--cta-text,#101521);
 }
 
 /* Responsive cockpit */
@@ -6985,7 +6985,7 @@ body[data-dash-v4="on"] .v4s-solo-gen-btn {
   padding: 11px 16px;
   /* v15.37 fix : couleurs HARDCODED (en thème sobre --cta=#0d1420 → noir, pas voulu) */
   background: var(--acc);
-  color: var(--cta-text,#fff);
+  color: var(--cta-text,#101521);
   border: 0;
   border-radius: 10px;
   font: 700 13px/1 'Inter', sans-serif;
@@ -7083,7 +7083,7 @@ body[data-dash-v4="on"] .v4s-solo-upsell p {
 }
 body[data-dash-v4="on"] .v4s-solo-upsell-btn {
   background: var(--acc);
-  color: var(--cta-text,#fff);
+  color: var(--cta-text,#101521);
   padding: 10px 20px;
   border-radius: 999px;
   border: 0;
@@ -9018,7 +9018,7 @@ body[data-dash-v4="on"] .v4h-todo-empty {
     display: flex; align-items: center; justify-content: center;
     box-shadow: none; border: 0; filter: none; transform: none;
   }
-  body[data-dash-v4="on"] .v4-bnav .v4-bn.fav-act .ic.fav-ring svg { width: 16px; height: 16px; stroke: #fff; }
+  body[data-dash-v4="on"] .v4-bnav .v4-bn.fav-act .ic.fav-ring svg { width: 16px; height: 16px; stroke: var(--cta-text); }
   body[data-dash-v4="on"] .v4-bnav .v4-bn.fav-act .lbl.fav-albl { margin-top: 2px; }
 
   /* Body : reserve space pour le bottom nav fixe (≈64px) */
@@ -9134,7 +9134,7 @@ body[data-dash-v4="on"] .v4h-todo-empty {
   font-size: 11px; cursor: pointer; background: var(--sur, #fff); color: var(--t1, #1f2937);
   white-space: nowrap;
 }
-.log-row-a-action:hover { background: var(--acc, #ff5a3c); color: var(--cta-text,#fff); border-color: var(--acc, #ff5a3c); }
+.log-row-a-action:hover { background: var(--acc, #ff5a3c); color: var(--cta-text,#101521); border-color: var(--acc, #ff5a3c); }
 .log-row-a-action-annonce { background: #fef3c7; color: #92400e; border-color: #f59e0b; font-weight: 600; }
 .log-row-a-action-annonce:hover { background: #fde68a; }
 
@@ -9177,8 +9177,8 @@ body[data-dash-v4="on"] .v4h-todo-empty {
 .loc-ech-b.loc-dep-cell::before { content: '' !important; }
 .loc-dep-dg { font-weight: 700; color: var(--warn); }
 .loc-dep-dg.late { color: var(--neg); }
-.loc-actions-b button.loc-dep-go { background: var(--acc,#ff5a3c); border-color: var(--acc,#ff5a3c); color: var(--cta-text,#fff); }
-.loc-actions-b button.loc-dep-go:hover { filter: brightness(1.06); background: var(--acc,#ff5a3c); border-color: var(--acc,#ff5a3c); color: var(--cta-text,#fff); }
+.loc-actions-b button.loc-dep-go { background: var(--acc,#ff5a3c); border-color: var(--acc,#ff5a3c); color: var(--cta-text,#101521); }
+.loc-actions-b button.loc-dep-go:hover { filter: brightness(1.06); background: var(--acc,#ff5a3c); border-color: var(--acc,#ff5a3c); color: var(--cta-text,#101521); }
 .loc-actions-b button.loc-dep-prep { background: #fff; border-color: var(--warn,#f59e0b); color: var(--ora,#b27a12); font-weight: 700; white-space: nowrap; }
 .loc-actions-b button.loc-dep-prep:hover { background: var(--warn,#f59e0b); color: #fff; border-color: var(--warn,#f59e0b); }
 .loc-card-row-b.warn-soon { background: var(--warn-soft); }
@@ -9228,7 +9228,7 @@ body[data-dash-v4="on"] .v4h-todo-empty {
   white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
 }
 .loc-actions-b button svg { width: 14px; height: 14px; flex: none; }
-.loc-actions-b button:hover { background: var(--acc, #ff5a3c); color: var(--cta-text,#fff); border-color: var(--acc, #ff5a3c); }
+.loc-actions-b button:hover { background: var(--acc, #ff5a3c); color: var(--cta-text,#101521); border-color: var(--acc, #ff5a3c); }
 /* v15.614 REFONTE-PC — couleurs d'action tokenisées (avant : hex #16a34a/#dc2626 inline) */
 .loc-actions-b button.loc-act-sign, .loc-actions-b button.loc-act-mrh-ok { color: var(--pos); }
 .loc-actions-b button.loc-act-mrh-no { color: var(--neg); }
@@ -9754,7 +9754,7 @@ span.cand-vbdg{cursor:default}
 .dep-step:last-child::before{display:none}
 .dep-dot{position:absolute;left:0;top:12px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;border:2px solid var(--bor);background:var(--sur)}
 .dep-dot.done{background:var(--grn);border-color:var(--grn);color:#fff}
-.dep-dot.cur{background:var(--acc);border-color:var(--acc);color:var(--cta-text,#fff);box-shadow:0 0 0 4px var(--acc-soft)}
+.dep-dot.cur{background:var(--acc);border-color:var(--acc);color:var(--cta-text,#101521);box-shadow:0 0 0 4px var(--acc-soft)}
 .dep-dot.lock{background:var(--sur3);color:var(--t3)}
 .dep-dot.wait{background:var(--bg-warning);border-color:var(--ora);color:var(--ora)}
 .dep-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -11110,7 +11110,7 @@ body[data-dash-v4="on"] .v4s-gest2-pill.warn{background:#fef3c7;color:#92400e}
 .evx-acc{display:flex;gap:12px;align-items:flex-start;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:12px;margin-bottom:10px}
 .evx-acc.abs{opacity:.7}
 .evx-box{flex:none;width:44px;height:44px;border-radius:10px;border:2px solid var(--t3);background:var(--sur);color:var(--cta-text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
-.evx-box[aria-checked="true"]{background:var(--pos);border-color:var(--pos)}
+.evx-box[aria-checked="true"]{background:var(--pos);border-color:var(--pos);color:var(--sur)}
 .evx-box[disabled]{cursor:default;opacity:.5}
 .evx-box svg{width:22px;height:22px}
 .evx-acc-tx{flex:1;min-width:0;font:400 15px/1.4 var(--font);color:var(--t1)}

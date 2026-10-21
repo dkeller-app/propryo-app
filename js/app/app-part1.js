@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.771';
+const IMMOTRACK_VERSION = '15.772';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -2614,7 +2614,7 @@ function _inEditableField(target) {
 /* v14.22 UNDO-OP Phase 2 : helper toast post-action critique avec bouton "↶ Annuler" inline.
    Utilisé par les wrappers _undoOp dans les ~11 fonctions delX (cf Phase 3). */
 function _undoToast(message, type) {
-  const btnHtml = ' <button onclick="_undoUndo()" style="margin-left:10px;background:var(--acc);color:var(--cta-text,#fff);border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-weight:600;font-size:12px">↶ Annuler</button>';
+  const btnHtml = ' <button onclick="_undoUndo()" style="margin-left:10px;background:var(--acc);color:var(--cta-text,#101521);border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-weight:600;font-size:12px">↶ Annuler</button>';
   showToast(message, type || 'ok', 8000, btnHtml);
 }
 
@@ -7869,7 +7869,7 @@ function _accmShowAregarder(){
       +'.atr .ic{width:38px;height:38px;border-radius:11px;background:var(--acc-soft);display:grid;place-items:center;flex:0 0 auto}'
       +'.atr .ic svg{width:19px;height:19px;stroke:var(--acc);fill:none;stroke-width:1.8}'
       +'.atr .m{flex:1;min-width:0}.atr .m .t{display:block;font-weight:700;color:var(--t1);font-size:14px}.atr .m .s{display:block;font-size:12px;color:var(--t3);margin-top:2px;overflow-wrap:anywhere}'
-      +'.atr .cnt{min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:var(--acc);color:var(--cta-text,#fff);font-weight:800;font-size:12px;display:grid;place-items:center;flex:0 0 auto}'
+      +'.atr .cnt{min-width:24px;height:24px;padding:0 8px;border-radius:999px;background:var(--acc);color:var(--cta-text,#101521);font-weight:800;font-size:12px;display:grid;place-items:center;flex:0 0 auto}'
       +'.atr .chev{width:16px;height:16px;stroke:var(--t3);fill:none;stroke-width:1.8;flex:0 0 auto}'
       +'.atl .empty{padding:34px 12px;text-align:center;color:var(--pos);font-weight:700}'
       +'.atl-st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--t2);margin:6px 2px 9px}.atl-st span{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--t3)}'
@@ -8091,7 +8091,7 @@ function _renderAccueilPhone(ctx){
   +'.accm .watch .m{flex:1;min-width:0}'
   +'.accm .watch .m .t{display:block;font-weight:800;font-family:var(--ff-display,\'Schibsted Grotesk\',\'Inter\',sans-serif);color:var(--t1);font-size:15.5px}'
   +'.accm .watch .m .s{display:block;font-size:12px;color:var(--t3);margin-top:2px;line-height:1.3}'
-  +'.accm .watch .cnt{min-width:25px;height:25px;padding:0 8px;border-radius:999px;background:var(--acc);color:var(--cta-text,#fff);font-weight:800;font-size:13px;display:grid;place-items:center;flex:0 0 auto}'
+  +'.accm .watch .cnt{min-width:25px;height:25px;padding:0 8px;border-radius:999px;background:var(--acc);color:var(--cta-text,#101521);font-weight:800;font-size:13px;display:grid;place-items:center;flex:0 0 auto}'
   +'.accm .watch .chev{width:17px;height:17px;stroke:var(--t3);fill:none;stroke-width:1.8;flex:0 0 auto}'
   +'</style>'
   +'<div class="accm">'
@@ -20702,12 +20702,12 @@ function previewBailData(bail, log, ref, opts) {
     +'.pz-pgnum{margin-left:auto;font-size:8pt;color:#ccc;white-space:nowrap;flex-shrink:0}'
     +'.btn-x{font-size:7.5pt;border:none;background:none;cursor:pointer;color:#c00;padding:0;line-height:1}'
     /* === Phase polish v12.60 — Mode wizard signature page par page === */
-    +'#toolbar .btn-wiz{background:#ff5a3c;color:var(--cta-text,#fff)}' /* FIL-ROUGE restyle : corail Propryo */
+    +'#toolbar .btn-wiz{background:#ff5a3c;color:var(--cta-text,#101521)}' /* FIL-ROUGE restyle : corail Propryo */
     +'#toolbar .wiz-counter{display:none;align-items:center;padding:4px 10px;background:rgba(255,255,255,.25);border-radius:12px;font-size:11px;font-weight:bold;margin-right:auto}'
     +'.wiz-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid #ccc;padding:10px 14px;display:none;gap:8px;z-index:9998;box-shadow:0 -2px 12px rgba(0,0,0,.15)}'
     +'.wiz-nav button{flex:1;min-height:48px;border:none;border-radius:6px;font-size:14pt;font-weight:bold;cursor:pointer;font-family:inherit}'
     +'.wiz-nav .wiz-prev{background:#e0e0e0;color:#333;flex:0 1 35%}'
-    +'.wiz-nav .wiz-next{background:#ff5a3c;color:var(--cta-text,#fff)}' /* FIL-ROUGE restyle : corail Propryo */
+    +'.wiz-nav .wiz-next{background:#ff5a3c;color:var(--cta-text,#101521)}' /* FIL-ROUGE restyle : corail Propryo */
     +'.wiz-nav .wiz-next:disabled{background:#aaa;cursor:not-allowed}'
     +'body.wizard-mode .wiz-nav{display:flex}'  /* hotfix v12.62 — règle manquante au commit 2 */
     /* En mode wizard : 1 page A4 plein écran, paraphes mis en valeur */
@@ -20775,7 +20775,7 @@ function previewBailData(bail, log, ref, opts) {
     +'.wizV2-sheet-pad{max-width:100%!important;height:150px!important}'
     +'.wizV2-sheet-hint{font-size:12.5px!important;color:#5f6f86!important;margin-top:8px!important}'
     +'.wizV2-sheet-foot{display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #e4e7ee}'
-    +'.wizV2-sheet-ok{flex:1;min-height:46px;border:0;border-radius:9px;background:#ff5a3c;color:var(--cta-text,#fff);font-size:15px;font-weight:800;cursor:pointer}'
+    +'.wizV2-sheet-ok{flex:1;min-height:46px;border:0;border-radius:9px;background:#ff5a3c;color:var(--cta-text,#101521);font-size:15px;font-weight:800;cursor:pointer}'
     /* Écran « Annexes au bail » (avant la signature finale d'un locataire présent) */
     +'.wizV2-ann-lead{font-size:14.5px;color:#3c4658;margin:0 0 12px}'
     +'.wizV2-ann-list{border:1px solid #e4e7ee;border-radius:10px;padding:4px 12px;margin:0 0 14px}'
@@ -21190,7 +21190,7 @@ function previewBailData(bail, log, ref, opts) {
     +    '+"<h2 style=\\"margin:8px 0 4px\\">"+nm(prevSigId)+" a sign\\u00e9</h2>"'
     +    '+"<p style=\\"color:#475569\\">Passer l\\u2019appareil au signataire suivant.</p>"'
     +    '+"<div style=\\"background:#dcfce7;border:1px solid #bbf7d0;color:#14532d;border-radius:8px;padding:12px;font-weight:600;margin:14px auto;max-width:320px\\">\\ud83d\\udd8a\\ufe0f Au tour de : "+nm(nextSigId)+"</div>"'
-    +    '+"<button class=\\"btn-wiz\\" onclick=\\"window._wizV2Current=1;_wizV2Render();_wizV2ScrollTop();\\" style=\\"background:#ff5a3c;color:#fff\\">"+nm(nextSigId)+" est pr\\u00eat \\u2192 continuer</button>"'
+    +    '+"<button class=\\"btn-wiz\\" onclick=\\"window._wizV2Current=1;_wizV2Render();_wizV2ScrollTop();\\" style=\\"background:#ff5a3c;color:var(--cta-text,#101521)\\">"+nm(nextSigId)+" est pr\\u00eat \\u2192 continuer</button>"'
     +  '+"</div>";'
     +  '_wizV2ScrollTop();'
     +'}'
@@ -22898,7 +22898,7 @@ function _avenantOpen(ref, opts){
    '#ov-avenant .av-obj{border:1px solid var(--bor);border-radius:9px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--sur2);font-weight:700;font-size:12px}'+
    /* fond du thème (--acc-soft) : le #fff6f4 codé en dur rendait le libellé invisible en mode sombre */
    '#ov-avenant .av-obj.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset;background:var(--acc-soft)}'+
-   '#ov-avenant .av-cb{width:16px;height:16px;border-radius:4px;border:2px solid var(--bor2);flex:0 0 auto;display:grid;place-items:center;font-size:11px;color:#fff}'+
+   '#ov-avenant .av-cb{width:16px;height:16px;border-radius:4px;border:2px solid var(--bor2);flex:0 0 auto;display:grid;place-items:center;font-size:11px;color:var(--cta-text)}'+
    '#ov-avenant .av-obj.on .av-cb{background:var(--acc);border-color:var(--acc)}'+
    '#ov-avenant .av-grp{border:1px solid var(--bor);border-radius:10px;padding:11px 12px;margin-top:10px}'+
    '#ov-avenant .av-grp h4{font:800 10px Inter;letter-spacing:.4px;text-transform:uppercase;color:var(--acc);margin:0 0 9px}'+

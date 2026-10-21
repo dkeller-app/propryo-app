@@ -10734,7 +10734,7 @@ function _ensureBiencPhCss(){
     '@media(max-width:767px){',
     '#p-biens .biens-toolbar{flex-direction:column;gap:10px;align-items:stretch}',
     // MOBILE-REFONTE lot 3a — bascule active = corail plein + texte blanc (charte books), téléphone uniquement.
-    '#p-biens .biens-view-toggle .bvt.act{background:var(--acc);color:var(--cta-text,#fff);box-shadow:none}',
+    '#p-biens .biens-view-toggle .bvt.act{background:var(--acc);color:var(--cta-text,#101521);box-shadow:none}',
     '#p-biens .biens-toolbar-left,#p-biens .biens-toolbar-right{width:100%}',
     '#p-biens .biens-toolbar-right{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
     '#p-biens .biens-view-toggle{display:flex;width:100%}',
@@ -11824,7 +11824,7 @@ ${detailsTable}
 ${legalNote}`;
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Récap 2044 — ${escHtml(ent.nom)} ${year}</title>
 <style>body{margin:0;padding:16mm 20mm;background:#fff}@media print{button{display:none}}
-.print-btn{position:fixed;top:10px;right:10px;background:#ff5a3c;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px}
+.print-btn{position:fixed;top:10px;right:10px;background:#ff5a3c;color:var(--cta-text,#101521);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px}
 ${_docCss()}</style>
 </head><body>
 <button class="print-btn no-print" onclick="window.print()">${_uiIcon('printer')} Imprimer / PDF</button>
@@ -17374,7 +17374,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.771 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.772 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }
@@ -18063,7 +18063,7 @@ function _renderLogFichePanelPhotos(log, ref) {
     const isCover = !!p.isCover;
     return `<div class="photo-tile" style="position:relative;background:var(--sur2);border:${isCover?'2px solid var(--acc)':'1px solid var(--bor)'};border-radius:8px;overflow:hidden;aspect-ratio:1/1;cursor:pointer" onclick="_openPhotoLightbox(${p.id})" title="${escHtml(p.originalName || p.name)}">
       <img id="photo-thumb-${p.id}" alt="${escHtml(p.originalName || p.name)}" style="width:100%;height:100%;object-fit:cover;display:block" data-photo-id="${p.id}" loading="lazy">
-      ${isCover?'<div style="position:absolute;top:6px;left:6px;background:var(--acc);color:var(--cta-text,#fff);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">'+_uiIcon('star',12)+' Couverture</div>':''}
+      ${isCover?'<div style="position:absolute;top:6px;left:6px;background:var(--acc);color:var(--cta-text,#101521);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">'+_uiIcon('star',12)+' Couverture</div>':''}
       <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(0deg,rgba(0,0,0,.7),transparent);padding:6px;color:#fff;font-size:10px;display:flex;justify-content:space-between;align-items:center" onclick="event.stopPropagation()">
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.originalName || p.name)}</span>
         <button class="btn bs bb" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);padding:2px 6px;margin-left:4px" onclick="event.stopPropagation();_togglePhotoCover(${p.id})" title="${isCover?'Retirer couverture':'Définir comme couverture'}">${isCover?'⭐':'☆'}</button>
@@ -19388,8 +19388,8 @@ function _ensureLogFichePhCss(){
     '.logf-ph-bailacts{display:flex;gap:7px;margin-top:12px}',
     '.logf-ph-bailact{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 2px;border:1px solid var(--bor);border-radius:11px;background:var(--sur2);color:var(--t2);font-weight:600;font-size:10px;cursor:pointer;font-family:inherit;text-align:center;line-height:1.15}',
     '.logf-ph-bailact svg{width:18px;height:18px;stroke:var(--t2);fill:none;stroke-width:1.8}',
-    '.logf-ph-bailact.pri{background:var(--acc);color:var(--cta-text,#fff);border-color:transparent}',
-    '.logf-ph-bailact.pri svg{stroke:var(--cta-text,#fff)}',
+    '.logf-ph-bailact.pri{background:var(--acc);color:var(--cta-text,#101521);border-color:transparent}',
+    '.logf-ph-bailact.pri svg{stroke:var(--cta-text,#101521)}',
     '.logf-ph-repwrap{margin-top:9px}',
     '}'
   ].join('');
@@ -25694,7 +25694,7 @@ function _frShowFr(kind){
   } else if(kind==='start'){
     // Porte UNIQUE (mockup validé) : « + Ajouter un bien » ouvre ce choix, d'où découle tout le fil.
     body.innerHTML='<div class="fr-after" style="padding-top:2px"><h2 class="fr-q" style="text-align:center;margin-bottom:6px">Comment on démarre ?</h2><p class="fr-qs" style="text-align:center;margin:0 auto 18px;max-width:420px">Après un achat, importer l’acte de vente : il pré-remplit le bailleur, l’immeuble et le lot d’un coup. Sinon, saisir à la main.</p><div class="fr-choices">'
-      +'<div class="fr-choice imm" onclick="_frStartActe()"><span class="ic">📄</span><div class="tx"><b>Importer l’acte de vente <span style="display:inline-block;font:800 9px system-ui;letter-spacing:.03em;text-transform:uppercase;color:var(--cta-text,#fff);background:var(--acc);border-radius:20px;padding:2px 7px;vertical-align:middle;margin-left:4px">Le plus rapide</span></b><s>Pré-remplit le bailleur, l’immeuble et le lot d’un coup</s></div><span class="chev">›</span></div>'
+      +'<div class="fr-choice imm" onclick="_frStartActe()"><span class="ic">📄</span><div class="tx"><b>Importer l’acte de vente <span style="display:inline-block;font:800 9px system-ui;letter-spacing:.03em;text-transform:uppercase;color:var(--cta-text,#101521);background:var(--acc);border-radius:20px;padding:2px 7px;vertical-align:middle;margin-left:4px">Le plus rapide</span></b><s>Pré-remplit le bailleur, l’immeuble et le lot d’un coup</s></div><span class="chev">›</span></div>'
       +'<div class="fr-choice log" onclick="_frOpenStep(window.FilRougeConductor.advance(\'start\',\'manual\'))"><span class="ic">✍️</span><div class="tx"><b>Saisir à la main</b><s>On crée le bailleur, puis on ajoute immeubles et logements</s></div><span class="chev">›</span></div>'
       +'</div></div>';
     foot.innerHTML=stop;
@@ -27632,7 +27632,7 @@ function _ensureAgendaPhCss(){
     '.agph-fbtn{display:inline-flex;align-items:center;gap:6px;position:relative;flex:0 0 auto;font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--bor);background:var(--sur);color:var(--t2);border-radius:9px;padding:8px 12px;min-height:38px;cursor:pointer}',
     '.agph-fbtn .uic{width:15px;height:15px}',
     '#agenda-controls.agph-filters-open .agph-fbtn{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 40%,var(--bor))}',
-    '.agph-fbtn .cnt{background:var(--acc);color:var(--cta-text,#fff);font-size:10px;font-weight:800;border-radius:999px;min-width:16px;height:16px;display:inline-grid;place-items:center;padding:0 4px}',
+    '.agph-fbtn .cnt{background:var(--acc);color:var(--cta-text,#101521);font-size:10px;font-weight:800;border-radius:999px;min-width:16px;height:16px;display:inline-grid;place-items:center;padding:0 4px}',
     '.agph-fbtn .cnt[hidden]{display:none}',
     '#agenda-controls-actions{gap:8px;flex-wrap:wrap}',
     '#agenda-controls-actions .bp{flex:1 1 auto;min-height:44px}', // CTA corail prééminent, pleine largeur restante

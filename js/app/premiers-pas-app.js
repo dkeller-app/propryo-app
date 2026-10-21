@@ -126,7 +126,7 @@ const CSS = `
 #pp-carte .pp-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
 #pp-carte .pp-chips{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 auto;min-width:0;list-style:none;margin:0;padding:0}
 .pp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 14px;border-radius:10px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;border:1px solid var(--bor);background:var(--sur);color:var(--t1);white-space:nowrap}
-.pp-btn.pri{background:var(--cta,var(--acc));border-color:var(--cta,var(--acc));color:var(--cta-text,#fff)}
+.pp-btn.pri{background:var(--cta,var(--acc));border-color:var(--cta,var(--acc));color:var(--cta-text,#101521)}
 .pp-btn.lien{border-color:transparent;background:none;color:var(--t2);padding:0 8px}
 .pp-btn:active{transform:translateY(1px)}
 .pp-btn:focus-visible,.pp-chip:focus-visible,#pp-tour .pp-bub:focus-visible,.pp-demo button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
