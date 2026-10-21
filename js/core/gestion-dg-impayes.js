@@ -178,9 +178,13 @@ export function _calculerSoldeDG(bail, mouvements) {
   // DÉPÔT DÉTENU (17/10) : la RETENUE POUR LOYER décidée à la restitution (`dgRetenueLoyer`, un règlement du loyer
   // par le dépôt) fait foi dès qu'elle est enregistrée, même à 0 (le bailleur ne retient rien) ; sinon les loyers
   // dus du bail lus dans le moteur unique (`loyerDu`, avant toute retenue — rendu pour être affiché à côté).
-  const loyerImpaye = _dgRetenueLoyerDecidee(bail) ?? loyerDu;
+  // Lot D (« 0 € muets ») : `_rgClotureImpayes` rend null quand le suivi des loyers est absent ou en échec — la dette
+  // est INCONNUE. Sans retenue décidée, `loyerIndisponible` le dit à l'écran ; le solde n'en déduit rien (et le dit).
+  const decidee = _dgRetenueLoyerDecidee(bail);
+  const loyerIndisponible = decidee == null && loyerDu == null;
+  const loyerImpaye = decidee ?? (loyerDu == null ? 0 : loyerDu);
   const soldeRestitue = Math.max(0, Math.round((dgPaid - retenuesDG - loyerImpaye) * 100) / 100);
-  return { dgPaid, retenuesDG, loyerImpaye, loyerDu, soldeRestitue };
+  return { dgPaid, retenuesDG, loyerImpaye, loyerDu, soldeRestitue, loyerIndisponible };
 }
 
 /** Le SOLDE DE TOUT COMPTE d'un bail est-il enregistré ? (décision pilotage 17/10, CDC Charges v15.574 « impayé = LOYER,

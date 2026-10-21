@@ -1415,24 +1415,25 @@ function _lyLigneDecision({ e, rev }) {
   const combine = effet1 >= eff2;
   const h1 = rev.nouveauHC;
   const h12 = r2 ? Math.round(h1 * r2 * 100) / 100 : null;
-  const h2 = r2 ? Math.round(e.log.hc * r2 * 100) / 100 : null;
+  const _base = (rev.ancienHC != null) ? rev.ancienHC : e.log.hc;   // O6 : base du barème, comme h1
+  const h2 = r2 ? Math.round(_base * r2 * 100) / 100 : null;
   const perte = (h12 != null && h2 != null) ? Math.round((h12 - h2) * 100) / 100 : null;
   const i2 = r2 ? '' : ` (indice T${T} ${n2 != null ? n2 : ''} pas encore publié : montant connu à sa parution)`;
   const R = _lyQ(e.ref);
   const html = `<div class="ly2-r" style="background:var(--warn-soft)">
     <div class="c1"><b>${escHtml(_logLabel(e.ref))}</b><span>${escHtml(e.log.locataire || '—')}</span></div>
     <div class="c2"><span class="ly2-p wa">à décider</span> Révision <b>de ${fd(rev.effetPrevuIso)}</b> jamais faite · celle du <b>${fd(eff2)}</b> arrive</div>
-    <div class="c3"><span class="ly2-p nu">${fmt(e.log.hc).replace(' €', '')}</span> → <b>${fmt(h1)}</b></div>
+    <div class="c3"><span class="ly2-p nu">${fmt(_base).replace(' €', '')}</span> → <b>${fmt(h1)}</b></div>
     <div class="c4"><button class="btn bs bb" onclick="_lyMenuRev(event,'${R}')" title="Plus d'actions" aria-label="Plus d'actions">⋯</button></div></div>
     <div class="ly2-dec" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;padding:10px 12px;background:var(--sur2);border-top:1px solid var(--bor)">
       <div style="background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
         <div><b>1 · Faire les deux</b> <span class="ly2-p nu">aucune variation perdue</span></div>
-        <div class="mu" style="font-size:12px;line-height:1.5">${an1} : <b>${fmt(e.log.hc)} → ${fmt(h1)}</b>, ${effet1 > today ? `effet au <b>${fd(effet1)}</b> (mois déjà quittancé : 1<sup>er</sup> mois libre)` : `effet à la demande (<b>${fd(effet1)}</b>)`}<br>${an2} : ${h12 != null ? `<b>${fmt(h1)} → ${fmt(h12)}</b>` : '—'}, effet au <b>${fd(eff2)}</b>${i2}</div>
+        <div class="mu" style="font-size:12px;line-height:1.5">${an1} : <b>${fmt(_base)} → ${fmt(h1)}</b>, ${effet1 > today ? `effet au <b>${fd(effet1)}</b> (mois déjà quittancé : 1<sup>er</sup> mois libre)` : `effet à la demande (<b>${fd(effet1)}</b>)`}<br>${an2} : ${h12 != null ? `<b>${fmt(h1)} → ${fmt(h12)}</b>` : '—'}, effet au <b>${fd(eff2)}</b>${i2}</div>
         <div style="font-size:11.5px;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:6px 8px">${combine ? `La révision ${an1} prend effet au ${fd(effet1)} ; la révision ${an2} se valide ensuite, à part : effet à sa propre demande, jamais avant.` : '⚠ Deux hausses à quelques jours d’écart : la loi dit « une fois par an » — le locataire peut contester.'}</div>
         <button class="btn bp bb" style="align-self:flex-start" onclick="applyIRL('${R}',${h1},{effetIso:'${effet1}'})">Faire la révision ${an1} maintenant</button></div>
       <div style="background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
         <div><b>2 · Ne faire que celle du ${fd(eff2)}</b> <span class="ly2-p nu">simple, incontestable</span></div>
-        <div class="mu" style="font-size:12px;line-height:1.5">${an2} : ${h2 != null ? `<b>${fmt(e.log.hc)} → ${fmt(h2)}</b>` : '—'}, effet au <b>${fd(eff2)}</b>${i2}<br>${an1} : <b>renoncée</b> (art. 17-1)</div>
+        <div class="mu" style="font-size:12px;line-height:1.5">${an2} : ${h2 != null ? `<b>${fmt(_base)} → ${fmt(h2)}</b>` : '—'}, effet au <b>${fd(eff2)}</b>${i2}<br>${an1} : <b>renoncée</b> (art. 17-1)</div>
         <div style="font-size:11.5px;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:6px 8px">${perte != null ? `≈ <b>${fmt(perte)}/mois</b> de moins pour toujours (la variation de ${an1} n'est jamais appliquée).` : `La variation de ${an1} n'est jamais appliquée.`}</div>
         <button class="btn bs bb" style="align-self:flex-start" onclick="_lyRenoncerPuisPreparer('${R}')">Renoncer à ${an1}, préparer ${an2}</button></div>
     </div>`;
@@ -1464,7 +1465,7 @@ function _lyLigneRev({ e, rev }, tard) {
     : `effet au <b>${effet}</b> · ${rev.variation >= 0 ? '+' : ''}${pct} %`);
   return { log: e.log, html: _lyRow({
     ref: e.ref, loc: e.log.locataire, demande: !!e.demande, contexte,
-    montant: `<span class="ly2-p nu">${fmt(e.log.hc).replace(' €', '')}</span> → <b>${fmt(rev.nouveauHC)}</b>`,
+    montant: `<span class="ly2-p nu">${fmt(rev.ancienHC != null ? rev.ancienHC : e.log.hc).replace(' €', '')}</span> → <b>${fmt(rev.nouveauHC)}</b>`,
     actions: `<button class="btn bp bb" onclick="applyIRL('${_lyQ(e.ref)}',${rev.nouveauHC})">Réviser</button>
       <button class="btn bs bb" onclick="_lyMenuRev(event,'${_lyQ(e.ref)}')" title="Plus d'actions : lettre, renoncer" aria-label="Plus d'actions">⋯</button>`
   }) };
@@ -2447,10 +2448,47 @@ function _qeRecuPartiel(ym) {
  */
 function _qeEditer() {
   if (_qe.libre) return _qeEditerLibre();
-  const rail = _qeRail();
-  const v = window.verdictEmission(rail, _qeSel());
+  let rail = _qeRail();
+  let v = window.verdictEmission(rail, _qeSel());
   if (!v.nbDocs) { showToast('Choisir un mois', 'err'); return; }
+  // DOC-Q (décision Didier 17/10) — mois échu SANS aucun paiement enregistré : « Paiement reçu hors relevé ? ». Oui →
+  // le paiement est enregistré (encaissement du lot, daté du jour), PUIS la quittance sort. Non → elle sort quand même,
+  // sans « payé le », tracée « sans paiement constaté ». Jamais bloquer.
+  let horsReleve = null;
+  const _QH = window.questionPaiementHorsReleve, _MH = window.mouvementHorsReleve;
+  // Relecture Opus : un arriéré antérieur (la cascade lui impute d'abord les paiements) ou un encaissement de loyer du lot
+  // daté dans le mois → le paiement est peut-être déjà enregistré : pas de question (jamais un loyer compté deux fois).
+  const _etQ = (typeof _loyerEtatLot === 'function') ? _loyerEtatLot(_qe.ref) : null;
+  // Relecture Fable : seulement les mois du bail EN COURS — la dette d'un ancien locataire ne tait pas la question.
+  const _debQ = String(((typeof _findBailByRefTolerant === 'function') && (_findBailByRefTolerant(_qe.ref) || {}).debut) || '').slice(0, 7);
+  const _arrQ = (_etQ && _etQ.byYm) ? Object.keys(_etQ.byYm).filter(k => k < _qe.ym && (!_debQ || k >= _debQ))
+    .reduce((s, k) => s + Math.max(0, Number(_etQ.byYm[k] && _etQ.byYm[k].reste) || 0), 0) : 0;
+  const _encQ = (DB.mouvements || []).some(m => m && !m._deleted && m.qui === _qe.ref && String(m.date || '').slice(0, 7) === _qe.ym
+    && (Number(m.cr) || 0) > 0 && (typeof _finCatLigne === 'function' ? ((_finCatLigne(m.cat) || {}).ligne2044 === '211') : m.cat === 'Loyers encaissés'));
+  const _qq = (typeof _QH === 'function' && typeof _MH === 'function')
+    ? _QH(rail.find(x => x.ym === _qe.ym) || null, _qeAPaiement(_qe.ym), { arriereAnterieur: _arrQ, encaisseDansLeMois: _encQ }) : null;
+  if (_qq) {
+    const _moisMaj = String(_qq.mois).charAt(0).toUpperCase() + String(_qq.mois).slice(1);
+    if (confirm2('Paiement reçu hors relevé (espèces, chèque) ?\n\n' + _moisMaj + ' : aucun paiement enregistré (' + fmt(_qq.montant) + ' dus).'
+      + '\n\nOK : enregistrer ce paiement de ' + fmt(_qq.montant) + ', daté d\'aujourd\'hui (modifiable ensuite dans Mouvements), puis éditer la quittance.'
+      + '\nChèque : à son arrivée sur un relevé importé, ne pas le classer une seconde fois en loyer.'
+      + '\n\nAnnuler : autre montant, ou quittance sans paiement constaté (question suivante).')) {
+      const _log = (DB.logements || []).find(l => l && l.ref === _qe.ref) || {};
+      const _jour = (typeof window._loyerTodayLocal === 'function') ? window._loyerTodayLocal() : td();
+      // Enregistré (saveDB) AVANT de relire le rail : le suivi des loyers est mémoïsé par génération de la base.
+      horsReleve = _mvCreate(_MH({ id: nid(), ref: _qe.ref, imm: _log.imm || '', mois: _qq.mois, montant: _qq.montant, dateIso: _jour }), { refresh: false });
+      rail = _qeRail();
+      v = window.verdictEmission(rail, _qeSel());
+    } else if (!confirm2('Éditer la quittance de ' + _qq.mois + ' SANS paiement constaté ?\n\nElle sort sans « payé le » et reste marquée « sans paiement constaté » dans l\'app. Une quittance vaut reçu (article 21 de la loi du 6 juillet 1989).'
+      + '\n\nAnnuler : rien n\'est émis (un paiement d\'un autre montant s\'enregistre dans Mouvements).')) {
+      return;
+    }
+  }
   const forces = new Set(v.risques.map(m => m.ym));
+  if (horsReleve && forces.has(_qe.ym)) {
+    showToast('Paiement enregistré, mais la cascade l\'impute d\'abord à un mois plus ancien encore dû : ' + window.ymToMoisFr(_qe.ym)
+      + ' reste non soldé, la quittance sort sans « payé le ».', 'warn', 9000);
+  }
   const faites = [], refusees = [];
   for (const ym of _qeSel()) {
     const m = rail.find(x => x.ym === ym);
@@ -2797,8 +2835,10 @@ function genIRLLetter(ref, opts) {
       ? window._baremeComputeDateEffetIRL({ anniversaireIso: annivIso, validationIso: _todayIsoLocal(), dernierMoisQuittanceYm: _dernierMoisQuittanceYm(ref) }).effetIso
       : '';
     const o = { force: _forcee, dateEffetIso: eff };
-    built = _buildIRLLetterHtml(log, bail, ent, rev, o);
-    lc = { log, rev, opts: o, ancienHC: log.hc, nouveauHC: rev && rev.nouveauHC, dateEffetIso: eff };
+    // O6 : « loyer actuel » = la base réelle de la révision (barème de la veille de l'effet), comme le calcul.
+    const logL = (rev && rev.ancienHC != null) ? Object.assign({}, log, { hc: rev.ancienHC }) : log;
+    built = _buildIRLLetterHtml(logL, bail, ent, rev, o);
+    lc = { log: logL, rev, opts: o, ancienHC: logL.hc, nouveauHC: rev && rev.nouveauHC, dateEffetIso: eff };
   }
   _irlLetterHtml = built.error ? (built.errorHtml || '') : built.html;
   if (!built.error && lc) _irlLetterCtx = Object.assign({ ref, bail, ent }, lc);
@@ -14439,13 +14479,15 @@ function _renderComptaKPIsForLog(ref, year) {
   const loyerAttendu = (typeof _computeExpectedRent === 'function')
     ? _computeExpectedRent(ref, year, lastVisibleMonth)
     : 0;
-  // Manque à gagner = max(0, attendu - encaissé), BORNÉ à l'attendu. Depuis que `loyersEnc`
-  // est un net, une restitution de trop-perçu le rend négatif : le manque dépassait alors le
-  // loyer attendu, et le « % vacance » saturait à 100 % sur un lot loué toute l'année. On ne
-  // peut pas manquer plus que ce qu'on attendait ; l'argent rendu se lit sur le solde.
-  const manqueAGagner = Math.min(loyerAttendu, Math.max(0, loyerAttendu - loyersEnc));
+  // R0-G (lot D) — le manque à gagner = ce qui reste DÛ sur les mois de l'année, lu dans le moteur unique (suivi des
+  // loyers : même cascade, avance, tolérance du 10 et retenues que l'onglet Loyers). Plus de `attendu − encaissé`
+  // recalculé ici (un encaissement de l'année qui solde un arriéré de l'an passé effaçait un impayé de cette année).
+  // Suivi indisponible → « calcul indisponible », jamais un montant inventé.
+  const _ym2 = (n) => String(n).padStart(2, '0');
+  const manqueAGagner = _finImpayeLotPeriode(ref, year + '-01', year + '-' + _ym2(lastVisibleMonth));
+  const manqueIndispo = (manqueAGagner == null);
   // Vacance % = part du loyer attendu non encaissé
-  const vacancePct = loyerAttendu > 0
+  const vacancePct = (!manqueIndispo && loyerAttendu > 0)
     ? Math.max(0, Math.min(100, Math.round((manqueAGagner / loyerAttendu) * 100)))
     : 0;
   // I3 (retour d'audit) : une catégorie non rattachée au référentiel n'est ni un loyer ni une
@@ -14475,14 +14517,14 @@ function _renderComptaKPIsForLog(ref, year) {
       + ` ${_causes.join(' ; ')}. ${_gestes}</div>`
     : '';
   const soldeCls  = solde > 0 ? 'k-ok' : (solde < 0 ? 'k-warn' : '');
-  const manqueCls = manqueAGagner > 0 ? 'k-warn' : 'k-ok';
+  const manqueCls = manqueIndispo ? 'k-mute' : (manqueAGagner > 0 ? 'k-warn' : 'k-ok');
   return `<div class="immf-kpis">
     <div class="immf-kpi" title="Loyers encaissés sur ce lot, NETS des sommes rendues au locataire (trop-perçu restitué). Même lecture que Finances."><div class="immf-kpi-v k-money">${fmt(loyersEnc)}</div><div class="immf-kpi-l">Loyers encaissés ${year} <small>nets</small></div></div>
     <div class="immf-kpi" title="Charges saisies SUR CE LOT, plus sa quote-part des compteurs collectifs de l’immeuble. Une taxe foncière ou un appel de copropriété saisi au niveau de l’immeuble n’y figure pas."><div class="immf-kpi-v k-money">${fmt(charges)}</div><div class="immf-kpi-l">Charges payées <small>sur ce lot</small></div></div>
     <div class="immf-kpi"><div class="immf-kpi-v k-money ${soldeCls}">${fmt(solde)}</div><div class="immf-kpi-l">Solde net</div></div>
-    <div class="immf-kpi" title="Loyer DÛ sur la période, moins les loyers encaissés nets. Un mois de VACANCE ne doit rien : il ne compte donc pas ici. Ce chiffre mesure l’impayé, pas le coût d’un logement vide — celui-là est dans le bilan annuel.">
-      <div class="immf-kpi-v k-money ${manqueCls}">${manqueAGagner > 0 ? '-' : ''}${fmt(manqueAGagner)}</div>
-      <div class="immf-kpi-l">Manque à gagner${vacancePct > 0 ? ` <small>(${vacancePct}% non encaissé)</small>` : ''}</div>
+    <div class="immf-kpi" title="Loyers et charges encore DUS sur les mois de l’année, lus dans le suivi des loyers (même calcul que l’onglet Loyers). Un mois de VACANCE ne doit rien : il ne compte donc pas ici. Ce chiffre mesure l’impayé, pas le coût d’un logement vide — celui-là est dans le bilan annuel.">
+      <div class="immf-kpi-v k-money ${manqueCls}">${manqueIndispo ? '—' : (manqueAGagner > 0 ? '-' : '') + fmt(manqueAGagner)}</div>
+      <div class="immf-kpi-l">Manque à gagner${manqueIndispo ? ' <small>(calcul indisponible)</small>' : (vacancePct > 0 ? ` <small>(${vacancePct}% non encaissé)</small>` : '')}</div>
     </div>
   </div>${avertNonClasses}`;
 }
@@ -17332,7 +17374,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.770 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.771 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }
@@ -28912,8 +28954,8 @@ function _dgOpenRestitution(ref, cle) {
         <tr><td>– Autres retenues <span class="mu" style="font-size:10.5px">(régularisation de charges, etc.)</span></td>
             <td style="text-align:right"><input class="inp" type="number" id="dg-restit-autres" value="${_dgAutresRetenues}" min="0" step="0.01" style="width:110px;text-align:right;color:var(--red)" onchange="_dgRestitRecalc('${_lyQ(ref)}')"></td></tr>
         <tr id="dg-restit-avert-row" hidden><td colspan="2">${_dgAvertRetenuesHtml(bail)}</td></tr>
-        <tr><td>– Loyer dû retenu sur le dépôt <span class="mu" style="font-size:10.5px;display:block">loyers dus du bail (suivi des loyers) : ${fmt(solde.loyerDu != null ? solde.loyerDu : solde.loyerImpaye)}</span><span id="dg-restit-loyer-warn" class="mu" hidden style="font-size:10.5px;display:block;color:var(--warn)"></span>${_dgRestitChargesNote(bail)}</td>
-            <td style="text-align:right"><input class="inp" type="number" id="dg-restit-loyer" value="${solde.loyerImpaye}" min="0" step="0.01" style="width:110px;text-align:right;color:var(--red)" onchange="_dgRestitRecalc('${_lyQ(ref)}')"></td></tr>
+        <tr><td>– Loyer dû retenu sur le dépôt <span class="mu" style="font-size:10.5px;display:block">${solde.loyerDu == null ? 'loyers dus du bail : calcul indisponible (suivi des loyers en échec)' + (solde.loyerIndisponible ? ' — saisir le loyer à retenir' : ' — retenue déjà décidée : ' + fmt(solde.loyerImpaye)) : 'loyers dus du bail (suivi des loyers) : ' + fmt(solde.loyerDu)}</span>${(bail.dgRetenueLoyerAVerifier && solde.loyerDu != null && Math.abs((Number(bail.dgRetenueLoyer) || 0) - solde.loyerDu) > 0.005) ? '<span class="mu" style="font-size:10.5px;display:block;color:var(--warn)">Retenue pour loyer enregistrée (' + fmt(Number(bail.dgRetenueLoyer) || 0) + ') sans pouvoir la comparer aux loyers dus, qui sont de ' + fmt(solde.loyerDu) + ' : la vérifier puis confirmer à nouveau.</span>' : ''}<span id="dg-restit-loyer-warn" class="mu" hidden style="font-size:10.5px;display:block;color:var(--warn)"></span>${_dgRestitChargesNote(bail)}</td>
+            <td style="text-align:right"><input class="inp" type="number" id="dg-restit-loyer" value="${solde.loyerIndisponible ? '' : solde.loyerImpaye}" min="0" step="0.01" style="width:110px;text-align:right;color:var(--red)" onchange="_dgRestitRecalc('${_lyQ(ref)}')"></td></tr>
         <tr id="dg-restit-pen-row" hidden><td>+ Pénalité de retard (art. 22)</td><td style="text-align:right;color:#185fa5;font-weight:600" id="dg-restit-pen-amt">—</td></tr>
         <tr style="border-top:2px solid var(--bor)">
           <td style="padding-top:8px;font-weight:700" id="dg-restit-solde-label">Solde à restituer au locataire</td>
@@ -28957,9 +28999,11 @@ function _dgRestitChargesNote(bail) {
   try {
     if (bail && bail.ref && bail.debut && typeof _rgClotureImpayes === 'function') {
       const fin = bail.finEffective || _bailFinOccupation(bail, false) || (typeof td === 'function' ? td() : '');
-      ch = _rgClotureImpayes(bail.ref, String(bail.debut).slice(0, 10), fin, 'charge') || 0;
+      ch = _rgClotureImpayes(bail.ref, String(bail.debut).slice(0, 10), fin, 'charge');
     }
-  } catch (e) { ch = 0; }
+  } catch (e) { ch = null; }
+  // Lot D : suivi des loyers en échec → dit, jamais tu.
+  if (ch == null) return '<span class="mu" style="font-size:10.5px;display:block">Provisions de charges encore dues : calcul indisponible.</span>';
   return ch > 0.005 ? '<span class="mu" style="font-size:10.5px;display:block">' + fmt(ch) + ' de provisions de charges restent dues : elles entrent dans la régularisation de charges, jamais dans le loyer retenu.</span>' : '';
 }
 // Le loyer dû retenu sur le dépôt, saisi dans la fenêtre (null si le champ est absent ou vide).
@@ -28977,10 +29021,11 @@ function _dgRestitLoyerEffectif(bail, dgVerse, retenuesTotal) {
   const s = _calculerSoldeDG(Object.assign({}, bail, { dgPaid: dgVerse, dgRetenu: retenuesTotal, fin: _bailFinOccupation(bail, false) }, saisi != null ? { dgRetenueLoyer: saisi } : {}), DB.mouvements || []);
   const voulu = Math.round((Number(s.loyerImpaye) || 0) * 100) / 100;
   const plafond = Math.max(0, Math.round((dgVerse - retenuesTotal) * 100) / 100);
-  const loyerDu = Math.round((Number(s.loyerDu) || 0) * 100) / 100;
+  // Lot D : loyers dus INCONNUS (suivi en échec) → aucun plafond inventé à 0 : la saisie fait foi, bornée au dépôt.
+  const loyerDu = (s.loyerDu == null) ? null : Math.round((Number(s.loyerDu) || 0) * 100) / 100;
   // borné aussi aux loyers dus (relecture Opus) : un surplus saisi ne serait ni du loyer (le moteur plafonne à la dette)
   // ni du dépôt détenu — il disparaîtrait. L'avertissement le dit, rien n'est bloqué.
-  return { saisi, voulu, plafond, retenu: Math.min(voulu, plafond, loyerDu), loyerDu };
+  return { saisi, voulu, plafond, retenu: (loyerDu == null) ? Math.min(voulu, plafond) : Math.min(voulu, plafond, loyerDu), loyerDu };
 }
 // (d) Avertissement sous « Autres retenues » (maquette validée 17/10) : une retenue pour travaux se justifie — art. 22
 // cité mot pour mot (_ART22_RESTITUTION) ; l'absence d'EDL de sortie est dite. Jamais bloquant.
@@ -29014,7 +29059,7 @@ function _dgRestitRecalc(ref) {
   const av = el('dg-restit-avert-row'); if (av) av.hidden = !(retenuesTotal > 0.005);
   const lw = el('dg-restit-loyer-warn');
   if (lw) {
-    const trop = rl.saisi != null && rl.saisi > rl.loyerDu + 0.005, court = rl.voulu > rl.plafond + 0.005;
+    const trop = rl.saisi != null && rl.loyerDu != null && rl.saisi > rl.loyerDu + 0.005, court = rl.voulu > rl.plafond + 0.005;
     lw.hidden = !(trop || court);
     lw.textContent = court ? 'Le dépôt ne couvre que ' + fmt(rl.plafond) + ' de loyer après les autres retenues : ' + fmt(rl.retenu) + ' retenus, le reste du loyer reste dû.'
       : (trop ? 'Plus que les loyers dus (' + fmt(rl.loyerDu) + ') : seuls ' + fmt(rl.retenu) + ' sont retenus, le surplus n’est pas du loyer.' : '');
@@ -29083,7 +29128,8 @@ function _dgConfirmerRestitution() {
   // porter au document une date qui n'était celle de rien.
   const dateRestitution = v('dg-restit-date') || '';
   const dgVerse = _dgVerseMontant(bail);
-  const retLoyer = _dgRestitLoyerEffectif(bail, dgVerse, retenuesTotal).retenu;   // ce que le solde déduit = ce qui est écrit
+  const _rlC = _dgRestitLoyerEffectif(bail, dgVerse, retenuesTotal);
+  const retLoyer = _rlC.retenu;   // ce que le solde déduit = ce qui est écrit
   const solde = _calculerSoldeDG({ ...bail, dgPaid: dgVerse, dgRetenu: retenuesTotal, fin: _bailFinOccupation(bail, false), dgRetenueLoyer: retLoyer }, DB.mouvements || []);
   // Pénalité art. 22 (au crédit du locataire) — ajoutée au montant restitué.
   const pen = window._penaliteRetardDG
@@ -29098,11 +29144,14 @@ function _dgConfirmerRestitution() {
   // marqué DG restitué » puis afficher « ✓ DG restitué » : ce serait un demi-état annoncé comme
   // complet. L'écran dit exactement ce qui sera écrit — et ce qui ne le sera pas.
   const _penLine = penMontant ? `\nDont pénalité de retard (art. 22) : ${fmt(penMontant)}` : '';
-  const _msgConfirm = dateRestitution
+  // Lot D (« 0 € muets ») : loyers dus inconnus (suivi des loyers en échec) et rien de saisi → dit avant d'enregistrer.
+  const _avLoyer = (_rlC.loyerDu == null && _rlC.saisi == null)
+    ? 'Loyers dus : calcul indisponible (suivi des loyers en échec) — aucun loyer n\'est déduit du dépôt.\n\n' : '';
+  const _msgConfirm = _avLoyer + (dateRestitution
     ? `Confirmer la restitution DG ?\n\nMontant restitué : ${fmt(montantRestitue)}${_penLine}\nDate du virement : ${fd(dateRestitution)}\n\nLe bail sera marqué comme "DG restitué" + entrée audit-trail.`
     : `Enregistrer une restitution INCOMPLÈTE ?\n\nMontant restitué : ${fmt(montantRestitue)}${_penLine}\nDate du virement : non renseignée\n\nLe montant, les retenues et l'entrée audit-trail sont conservés, `
       + `mais le bail restera « à restituer » tant que la date manque — c'est elle qui déclenche le `
-      + `délai de l'article 22. À compléter dès que le virement est fait.`;
+      + `délai de l'article 22. À compléter dès que le virement est fait.`);
   if (!confirm2(_msgConfirm)) return;
 
   // dgRetenu = réparations (vétusté) + régul préservée ; depart.reparations = part vétusté seule
@@ -29111,6 +29160,9 @@ function _dgConfirmerRestitution() {
   // DÉPÔT DÉTENU (17/10) : le loyer dû réglé par le dépôt — lu par le moteur des loyers (dette du bail soldée d'autant)
   // et par les dépôts détenus (il n'est plus l'argent du locataire).
   bail.dgRetenueLoyer = retLoyer;
+  // Lot D (relecture Fable) : retenue décidée alors que les loyers dus étaient incalculables → à revérifier dès que le
+  // calcul revient (la fenêtre de restitution le dit). Retirée dès qu'une restitution est confirmée avec le calcul.
+  if (_rlC.loyerDu == null) bail.dgRetenueLoyerAVerifier = true; else delete bail.dgRetenueLoyerAVerifier;
   bail.dgDetailRetenues = detailRetenues;
   // NORMALISATION-LOYERS (01/10, RGPD) : l'IBAN du locataire n'est plus demandé ni gardé. Un ancien
   // IBAN encore porté par ce bail est retiré ici (la normalisation le retire aussi au chargement).
@@ -29129,7 +29181,7 @@ function _dgConfirmerRestitution() {
   bail.depart.vetusteLignes = _dgVgRows.map((r, i) => ({ piece: r.piece, type: r.type, cout: Number(r.cout) || 0, source: r.source, mes: r.mes || '',
     part: _vgParLigne[i] ? Number(_vgParLigne[i].part) || 0 : undefined, usurePct: _vgParLigne[i] ? _vgParLigne[i].usurePct : undefined }));
   _stamp(bail);
-  _archiveRecopierSurCopies(bail, ['dgRetenu', 'dgRetenueLoyer', 'dgDetailRetenues', 'locNouvIban', 'dgRestitueAt', 'dgRestitueMontant', 'dgAdresseNonCommuniquee', 'dgPenaliteArt22', 'depart']);   // archive en double : la restitution sur TOUTES ses copies
+  _archiveRecopierSurCopies(bail, ['dgRetenu', 'dgRetenueLoyer', 'dgRetenueLoyerAVerifier', 'dgDetailRetenues', 'locNouvIban', 'dgRestitueAt', 'dgRestitueMontant', 'dgAdresseNonCommuniquee', 'dgPenaliteArt22', 'depart']);   // archive en double : la restitution sur TOUTES ses copies
   if (typeof _auditLog === 'function') {
     _auditLog('dg-restitution', 'bail', ref,
       `restitué=${montantRestitue}€ réparations=${reparations}€ autres=${autres}€ loyer retenu=${solde.loyerImpaye}€ pénalité=${penMontant}€`);
@@ -33367,6 +33419,19 @@ function _finSuiviLot(qui, opts) {
   _finSuiviCache.map[cle] = res;
   return res;
 }
+// R0-G (lot D) — la DETTE d'un lot sur une période [fromYm, toYm], lue dans le moteur unique (suivi des loyers, même
+// cascade, même tolérance que l'onglet Loyers) : Σ des loyers et charges encore dus des mois de la période. null = suivi
+// indisponible (dette INCONNUE), jamais 0.
+function _finImpayeLotPeriode(ref, fromYm, toYm) {
+  const s = (typeof _finSuiviLot === 'function') ? _finSuiviLot(ref) : null;
+  if (!s) return null;
+  let t = 0;
+  (s.baux || []).forEach(b => (b.mois || []).forEach(m => {
+    if (!m || m.ym < fromYm || m.ym > toYm) return;
+    t += (Number(m.loyerRetard) || 0) + (Number(m.chargeRetard) || 0);
+  }));
+  return Math.round(t * 100) / 100;
+}
 // R0-C — la dette d'UN bail, lue dans le moteur unique (même point de départ, même antériorité, mêmes manques et
 // retenues que Finances). `bailDebut` désigne le bail ; `fin` (Q3) borne le dû au jour près s'il précède la fin.
 function _finDetteBail(ref, bailDebut, fin, opts) {
@@ -33396,7 +33461,10 @@ function _finMonthly(yr, scope, win) {
   const gen = (typeof window._dbGen === 'number') ? window._dbGen : 0;
   if (gen !== _finMonthlyCache.gen) { _finMonthlyCache.gen = gen; _finMonthlyCache.m.clear(); }
   let _key = null;
-  try { _key = String(yr) + '|' + JSON.stringify(scope) + '|' + JSON.stringify(win); } catch (e) {}
+  // Lot D (audit avant bêta) : le JOUR entre dans la clé — le moteur lit « aujourd'hui » (exigibilité, tolérance du
+  // 10, mois en cours) : une app restée ouverte après minuit ne doit pas garder les impayés de la veille.
+  const _jour = (typeof window._loyerTodayLocal === 'function') ? window._loyerTodayLocal() : new Date().toISOString().slice(0, 10);
+  try { _key = String(yr) + '|' + _jour + '|' + JSON.stringify(scope) + '|' + JSON.stringify(win); } catch (e) {}
   if (_key && _finMonthlyCache.m.has(_key)) return _finMonthlyCache.m.get(_key);
   const isWin = !!(win && typeof win === 'object');
   const _res = window._computeFinancesMonthly({

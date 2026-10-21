@@ -107,7 +107,7 @@ import {
 // AUDIT-SUIVI-LOYERS étape 1/2 — barème de loyer historisé (source de vérité du dû dans le temps)
 import { bailLoueAu } from './core/fin-occupation.js';
 import { bailHistCle, nouvelIdArchive } from './core/store-mapping.js';
-import { duMois, duMoisFromRaw, duMoisSuiviFromRaw, bailsFromRaw, finOccupationBail, _baremeOfLot, periodeEnVigueurA, provisionPourRevision, _debutSuivi, _computeLoyerNetting, tauxPleinMois, tauxPleinMoisFromRaw } from './core/loyer-du-mois.js';
+import { duMois, duMoisFromRaw, duMoisSuiviFromRaw, bailsFromRaw, finOccupationBail, _baremeOfLot, periodeEnVigueurA, provisionPourRevision, baseRevisionHC, _debutSuivi, _computeLoyerNetting, tauxPleinMois, tauxPleinMoisFromRaw } from './core/loyer-du-mois.js';
 import { reconstruireBaremeLot } from './core/loyer-migration.js';
 import { computeEntretienStatut } from './core/entretien-statut.js';
 import { regrouperEntretiens } from './core/entretien-regroupement.js';   // RETOURS 15/10 lot 2 — poêle / insert : une échéance
@@ -141,6 +141,7 @@ import { forfaitAvenantsDuBail, occNonForfaitJours, forfaitIntervalles, applique
 // Qui est le bailleur, et donc quelle duree minimale s'impose (art. 10 ET art. 13).
 import { regimeBailleur, dureeBailNuLabel, dureeBailNuPhrase, sousTitreBailNu } from './core/bail-duree.js';
 import { decompteRestitution, decompteRestitutionCorps } from './core/decompte-restitution.js';
+import { noticeCongeRequise, noticeCongeProDoc } from './core/conge-notice.js';   // F-4 : notice jointe au congé (arrêté du 13/12/2017)
 import { CONGE_MOTIFS, REPRISE_LIENS, CONGE_CAS_REDUITS, ART15_II_ALINEAS, letterToProDoc, art15IIProDoc, congeBailleurPreavisMois, congeLocatairePreavis, addMoisClamped as congeAddMois, locataireProtege, PREAVIS_REDUIT_CAS, preavisReduitClause, congeMotifDetail, congeDateEffet, congeMentionPreavis, congeBailleurModele, congePhraseTerme } from './core/conge.js';
 // DOC-C — un acte ne part pas en PDF avec ses trous. Détection des mentions restées vides dans
 // le document RENDU, et fondement légal quand l'absence emporte nullité (art. 15-I / 15-II).
@@ -382,8 +383,10 @@ import { dateVersementDG, dateRestitutionDG, dateEDLSortie, dateLiberation } fro
 import {
   MOIS_ETAT, moisRailLot, moisParDefaut, anneeParDefaut, anneesDisponibles,
   verdictEmission, etiquetteSansPaiement, validerSaisieLibre, cleMeta,
-  metaApresEmission, metaApresSuppression
+  metaApresEmission, metaApresSuppression, questionPaiementHorsReleve, mouvementHorsReleve
 } from './core/quittance-editeur.js';
+window.questionPaiementHorsReleve = questionPaiementHorsReleve;   // DOC-Q (décision Didier 17/10)
+window.mouvementHorsReleve = mouvementHorsReleve;
 
 // CDC-LOYERS-DESIGN V20/V21 — les garde-fous NON BLOQUANTS de la révision IRL.
 // Les textes de loi et de conséquence vivent ici, pas dans l'écran.
@@ -616,6 +619,7 @@ window.bailLoueAu = bailLoueAu;   // LE statut loué / vacant d'un lot (décisio
 window._baremeOfLot = (ref) => _baremeOfLot(appDbFrom(window)?.loyerBareme || [], ref);
 window._loyerPeriodeEnVigueurA = periodeEnVigueurA;
 window._loyerProvisionPourRevision = provisionPourRevision;
+window._loyerBaseRevisionHC = baseRevisionHC;   // O6 : la base d'une révision = le barème de la veille de l'effet
 window._debutSuivi = _debutSuivi;
 window._computeLoyerNetting = _computeLoyerNetting;
 window._baremeComputeDateEffetIRL = computeDateEffetIRL;
@@ -817,6 +821,8 @@ window.preavisReduitClause = preavisReduitClause;
 window.ART15_II_ALINEAS = ART15_II_ALINEAS;
 window.letterToProDoc = letterToProDoc;
 window.art15IIProDoc = art15IIProDoc;
+window.noticeCongeRequise = noticeCongeRequise;   // F-4
+window.noticeCongeProDoc = noticeCongeProDoc;
 window.mentionsManquantes = mentionsManquantes;
 window.emporteNullite = emporteNullite;
 window.messageMentionsManquantes = messageMentionsManquantes;

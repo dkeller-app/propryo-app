@@ -109,7 +109,14 @@ export function computePilotageFamilles(input) {
     return { id: z.id, titre: z.titre, familles: fs, count: fs.reduce((s, f) => s + f.count, 0) };
   }).filter((z) => z.familles.length);
 
-  return { familles, parZone, total };
+  // Lot D (« 0 € muets ») — familles dont le CALCUL a échoué : rendues à part, pour que l'écran dise « calcul
+  // indisponible » au lieu de « ✓ À jour ». Une famille indisponible n'a ni compte ni montant.
+  const indisponibles = Array.isArray(src.indisponibles)
+    // Relecture Opus : une famille NON vide peut être partielle (un lot en échec) — listée aussi, l'écran la dit « incomplète ».
+    ? FAMILLES.map((f) => f.id).filter((id) => src.indisponibles.indexOf(id) >= 0)
+    : [];
+
+  return { familles, parZone, total, indisponibles };
 }
 
 /** Ordre global d'une famille (pour un test ou un tri externe). -1 si inconnue. */

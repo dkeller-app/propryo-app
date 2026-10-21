@@ -241,4 +241,41 @@ export function validerSaisieLibre(saisie) {
   };
 }
 
+/**
+ * DOC-Q (décision Didier 17/10) — QUITTANCE D'UN MOIS SANS PAIEMENT ENREGISTRÉ. Une quittance vaut présomption de
+ * paiement (art. 21 loi 89-462) : avant de l'émettre sur un mois échu où RIEN n'est arrivé, l'app demande « Paiement
+ * reçu hors relevé (espèces, chèque) ? ». Oui → le paiement est enregistré, puis la quittance sort. Non → elle sort
+ * quand même (sans « payé le », trace « sans paiement constaté ») : jamais bloquer.
+ * Pas de question si un versement est déjà imputé (paiement partiel : le reçu partiel est proposé à part), ni sur un
+ * mois soldé, futur, hors bail ou déjà quittancé.
+ * @param {{ym:string, mois:string, etat:string, reste:number}|null} mois  entrée du rail
+ * @param {boolean} aPaiement  un versement est-il déjà imputé à ce mois ?
+ * @param {{arriereAnterieur?:number, encaisseDansLeMois?:boolean}} [o]  relecture Opus : la cascade impute un paiement au
+ *   mois le plus ancien encore dû — avec un arriéré ANTÉRIEUR, ou un encaissement de loyer daté dans le mois, le paiement
+ *   du mois est peut-être DÉJÀ enregistré : la question ferait compter un loyer deux fois. Pas de question alors.
+ * @returns {{ym:string, mois:string, montant:number}|null}
+ */
+export function questionPaiementHorsReleve(mois, aPaiement, o) {
+  if (!mois || mois.etat !== MOIS_ETAT.NO || aPaiement) return null;
+  const opt = o || {};
+  if ((Number(opt.arriereAnterieur) || 0) > EPS_CENTIME || opt.encaisseDansLeMois) return null;
+  const montant = _r2(mois.reste);
+  if (!(montant > EPS_CENTIME)) return null;
+  return { ym: mois.ym, mois: mois.mois, montant };
+}
+
+/**
+ * DOC-Q — le paiement « hors relevé » enregistré : un encaissement de loyer du lot (catégorie « Loyers encaissés »,
+ * ligne 211), daté du jour de la saisie (modifiable ensuite dans Mouvements), du montant restant dû du mois. La cascade
+ * unique l'impute comme tout encaissement — aucun rattachement inventé au mois.
+ */
+export function mouvementHorsReleve(o) {
+  const i = o || {};
+  return {
+    id: i.id, date: String(i.dateIso || '').slice(0, 10),
+    lib: 'Loyer ' + String(i.mois || '') + ' — reçu hors relevé (espèces, chèque)',
+    imm: i.imm || '', cat: 'Loyers encaissés', qui: i.ref, db: 0, cr: _r2(i.montant), fac: '', compteurCcId: ''
+  };
+}
+
 export { EPS_CENTIME };

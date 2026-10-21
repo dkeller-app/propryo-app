@@ -104,6 +104,25 @@ export function provisionPourRevision(bareme, ref, dateEffetIso, bailCh, logCh, 
 }
 
 /**
+ * O6 (audit avant bêta, lot D) — LE LOYER À RÉVISER : le loyer HC EN VIGUEUR la veille de la date d'effet d'une
+ * révision (IRL, cycle éteint), lu au barème — la seule source qu'une correction manuelle datée met à jour
+ * (`_histoSaveCorrPeriode` n'écrit QUE dans le barème). Avant : `log.hc`, qui ignorait la correction et l'écrasait à
+ * la révision suivante. Même borne que `provisionPourRevision` : une période d'un AUTRE bail (barème mal refermé)
+ * n'est pas retenue. Repli : le loyer du lot (`logHc`), comme avant, pour un barème vide ou un montant non saisi.
+ * @returns {number}
+ */
+export function baseRevisionHC(bareme, ref, dateEffetIso, logHc, bailDebut) {
+  const repli = Number(logHc) || 0;
+  const eff = String(dateEffetIso == null ? '' : dateEffetIso).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eff)) return repli;
+  const p = periodeEnVigueurA(bareme, ref, _isoVeille(eff));
+  const pOk = p && (bailDebut == null || p.bailDebut == null
+    || String(p.bailDebut).slice(0, 10) === String(bailDebut).slice(0, 10));
+  const n = premierMontantSaisi(pOk ? p.hc : null);
+  return n != null ? n : repli;
+}
+
+/**
  * Segments d'occupation normalisés depuis les baux du lot (vivants, triés, TRONQUÉS).
  * end = null → occupation ouverte (bail courant, tacite reconduction incluse).
  */

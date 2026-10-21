@@ -603,7 +603,7 @@ Fait à {{entite.siege}}, le {{dateLettre}}.
 
 {{entite.signataire}}`,
     attachments: [],
-    legalNote: 'OBLIGATOIRE : LRAR ou signification par huissier ou remise en main propre contre récépissé. Mentionner précisément le motif (vente, reprise pour soi/proche, motif sérieux et légitime). Joindre justificatifs.'
+    legalNote: 'OBLIGATOIRE : LRAR ou signification par huissier ou remise en main propre contre récépissé. Mentionner précisément le motif (vente, reprise pour soi/proche, motif sérieux et légitime). Joindre justificatifs. Reprise ou vente : joindre la notice d\'information de l\'arrêté du 13 décembre 2017 (art. 15-I) — le document « Congé / résiliation » de la fiche du bien la joint d\'office.'
   },
 
   // BAUX-ECHUS — BAIL MEUBLÉ : refus de renouvellement motivé, art. 25-8, I (cité mot pour mot,

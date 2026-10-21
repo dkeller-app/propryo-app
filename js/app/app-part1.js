@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.770';
+const IMMOTRACK_VERSION = '15.771';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -7610,7 +7610,7 @@ function _pilCollectFamilles(ctx) {
   const joursDepuis = (iso) => { if (!iso) return null; const d = new Date(String(iso).slice(0, 10) + 'T00:00:00'); return isNaN(d) ? null : Math.floor((todayD - d) / 86400000); };
   const AR = window.AlertRules || {};
   const isLoyer = _isLoyerCategory;   // NORMALISATION-LOYERS : plus de repli sur la catégorie héritée « Loyers »
-  const src = { depot: [], irl: [], impaye: [], regul: [], finbail: [], document: [], incident: [], entretien: [], vacant: [] };
+  const src = { depot: [], irl: [], impaye: [], regul: [], finbail: [], document: [], incident: [], entretien: [], vacant: [], indisponibles: [] };
 
   // ── INCIDENTS non résolus (TRAVAUX : QUI PAIE ?) : registre DB.incidents, périmètre = lots visibles
   //    (ou immeubles de ces lots pour une partie commune). Urgences en tête, puis ancienneté. ──
@@ -7630,7 +7630,8 @@ function _pilCollectFamilles(ctx) {
 
   // ── IMPAYÉS (byLot / suivi — R-0) : montant dû, ancienneté = plus vieux mois impayé ──
   try {
-    const imp = (typeof _computeImpayes === 'function') ? _computeImpayes(ctx) : { items: [] };
+    const imp = (typeof _computeImpayes === 'function') ? _computeImpayes(ctx) : { items: [], indisponible: true };
+    if (imp.indisponible) src.indisponibles.push('impaye');   // lot D : panne DITE, jamais « ✓ À jour »
     (imp.items || []).forEach(it => {
       // C2 : l'ancienneté vient du MAÎTRE (byLot) via it.depuisYm (1er mois portant un résidu) —
       // l'ancien recalcul par _suiviLoyerStrip lisait un champ `ym` absent → toujours null (audit).
@@ -7641,7 +7642,7 @@ function _pilCollectFamilles(ctx) {
       const _mens = _lot ? ((Number(_lot.hc) || 0) + (Number(_lot.ch) || 0)) : 0;
       src.impaye.push({ ref: it.ref, nom: it.locataire || _logLabel(it.ref), montant: it.reste || 0, urgenceJours: anc, loyerMensuel: _mens });
     });
-  } catch (e) {}
+  } catch (e) { console.error('[Pilotage] impayés : calcul indisponible', e); if (src.indisponibles.indexOf('impaye') < 0) src.indisponibles.push('impaye'); }
 
   // ── VACANTS : occupation en jours (moteur socle) + candidatures rattachées ──
   try {
@@ -8006,7 +8007,8 @@ function _renderAccueilPhone(ctx){
   var fams={total:0,familles:[]}; try{ fams=_pilCollectFamilles(ctx); }catch(e){}
   var aReg = fams.total||0, famBy={}; (fams.familles||[]).forEach(function(f){ famBy[f.id]=f; });
   var bits=[];
-  if(famBy.impaye) bits.push(famBy.impaye.count+' impayé'+(famBy.impaye.count>1?'s':''));
+  if(famBy.impaye) bits.push(famBy.impaye.count+' impayé'+(famBy.impaye.count>1?'s':'')+(((fams.indisponibles||[]).indexOf('impaye')>=0)?' (calcul incomplet)':''));
+  else if((fams.indisponibles||[]).indexOf('impaye')>=0) bits.push('impayés : calcul indisponible');
   if(famBy.finbail) bits.push(famBy.finbail.count+' départ'+(famBy.finbail.count>1?'s':'')+' proche'+(famBy.finbail.count>1?'s':''));
   if(famBy.incident){ var _iu=(famBy.incident.items||[]).filter(function(x){return x.urgent;}).length; if(_iu) bits.push(_iu+' incident'+(_iu>1?'s':'')+' urgent'+(_iu>1?'s':'')); }
   if(!bits.length && famBy.vacant) bits.push(famBy.vacant.count+' vacant'+(famBy.vacant.count>1?'s':''));
@@ -8174,7 +8176,7 @@ function _pilChiffre(f) {
   return (j <= 0) ? 'échéance dépassée' : ('dans ' + j + ' j');
 }
 
-function _pilBulleHtml(f, premier) {
+function _pilBulleHtml(f, premier, incomplet) {
   const sel = (typeof _pilMtxFamActive !== 'undefined' && _pilMtxFamActive === f.id) ? ' sel' : '';
   return '<button type="button" class="pil-b todo' + (premier ? ' hot' : '') + sel + '" data-pilfam="' + f.id + '">'
     + '<span class="bh"><span class="ic"><svg viewBox="0 0 24 24">' + (_PIL_ICONS[f.id] || '') + '</svg></span></span>'
@@ -8182,7 +8184,17 @@ function _pilBulleHtml(f, premier) {
     + '<span class="v">' + escHtml(f.lbl) + '</span>'
     + '<span class="a ' + ((f.id !== 'depot' && f.montant != null && Math.abs(f.montant) > 0.005) ? 'euro' : 'txt') + '">' + _pilChiffre(f) + '</span>'   // dépôt : une phrase, jamais coupée (M-14)
     + '<span class="sub">' + _pilPireTxt(f) + '</span>'
+    + (incomplet ? '<span class="sub">calcul incomplet</span>' : '')
     + '</button>';
+}
+// Lot D (« 0 € muets ») — famille dont le calcul a échoué : MÊME carte, sans liséré vert, « Calcul indisponible ».
+function _pilBulleIndispoHtml(def) {
+  return '<div class="pil-b" aria-label="' + escHtml(def.lbl) + ' — calcul indisponible">'
+    + '<span class="bh"><span class="ic"><svg viewBox="0 0 24 24">' + (_PIL_ICONS[def.id] || '') + '</svg></span></span>'
+    + '<span class="v">' + escHtml(def.lbl) + '</span>'
+    + '<span class="a txt">Calcul indisponible</span>'
+    + '<span class="sub">recharger l\'application</span>'
+    + '</div>';
 }
 // Bulle « à jour » : MÊME carte, liséré vert + « ✓ À jour » (Didier : pas de bulle grise ; on garde
 // le design et on met un liséré vert). Non cliquable — rien à filtrer.
@@ -8349,19 +8361,22 @@ function _renderPilotage(ctx) {
   //    traiter) : Bail/EDL/Caution n'ont PAS de bulle, donc « tout est à jour » ne doit pas s'afficher
   //    si la matrice a des lots à mettre en règle (audit vitrine). Hosts DOM distincts → ordre libre.
   let _nKoMtx = 0; try { _nKoMtx = _renderPilMatrice(ctx) || 0; } catch (e) {}
-  const _enTete = fams.total ? (fams.total + ' à traiter')
-    : (_nKoMtx ? (_nKoMtx + ' lot' + (_nKoMtx > 1 ? 's' : '') + ' à mettre en règle') : 'tout est à jour');
+  const _indispoF = (fams.indisponibles || []);
+  const _enTete = fams.total ? (fams.total + ' à traiter' + (_indispoF.length ? ' · calcul des impayés incomplet' : ''))
+    : (_nKoMtx ? (_nKoMtx + ' lot' + (_nKoMtx > 1 ? 's' : '') + ' à mettre en règle')
+      : (_indispoF.length ? 'calcul des impayés indisponible' : 'tout est à jour'));
   bullesEl.innerHTML = '<div class="pil-zt"><b>Ce qui presse</b><i></i><em>' + _enTete + '</em></div>'
     + _famZones.map(z => {
         const defs = _famDefs.filter(d => d.zone === z.id);
         const nz = defs.reduce((s, d) => s + (_famById[d.id] ? _famById[d.id].count : 0), 0);
         return '<div class="pil-zbloc"><div class="pil-zt"><b>' + esc(z.titre) + '</b><i></i><em>'
-          + (nz ? (nz + ' à traiter') : 'à jour') + '</em></div>'
+          + (nz ? (nz + ' à traiter') : (defs.some(d => _indispoF.indexOf(d.id) >= 0) ? 'calcul indisponible' : 'à jour')) + '</em></div>'
           + '<div class="pil-bub">' + defs.map(d => {
               const f = _famById[d.id];
               // TRAVAUX : QUI PAIE ? — « Incidents à traiter » n'a pas de bulle « à jour » (décision 13/10).
               if (!f && ((window._PIL_SI_NON_VIDES || []).indexOf(d.id) >= 0)) return '';
-              return f ? _pilBulleHtml(f, f.id === premierId) : _pilBulleOkHtml(d);
+              if (!f && _indispoF.indexOf(d.id) >= 0) return _pilBulleIndispoHtml(d);
+              return f ? _pilBulleHtml(f, f.id === premierId, _indispoF.indexOf(d.id) >= 0) : _pilBulleOkHtml(d);
             }).join('') + '</div></div>';
       }).join('');
 }
@@ -8372,10 +8387,12 @@ let _pilMtxFilter = 'tous';
 // _computeUnifiedTodo, celui des bulles) : ces surfaces d'un même lot ne se contredisent jamais. PNO / items hors-lot exclus.
 function _pilColRefs(ctx) {
   const impaye = new Set(), impayes = {}, parRef = {};
+  let indisponible = false;   // lot D : impayés incalculables → la colonne Loyer le DIT (pas de « payé » par défaut)
   try {
     const imp = (typeof _computeImpayes === 'function') ? _computeImpayes(ctx) : null;
+    if (!imp || imp.indisponible) indisponible = true;
     if (imp && imp.items) imp.items.forEach(it => { impaye.add(it.ref); impayes[it.ref] = it; });
-  } catch (e) {}
+  } catch (e) { indisponible = true; }
   try {
     const lotRefs = new Set(((ctx && ctx.scopeLogs) || []).map(l => l.ref));
     const todo = (typeof _computeUnifiedTodo === 'function') ? _computeUnifiedTodo(ctx) : [];
@@ -8385,7 +8402,7 @@ function _pilColRefs(ctx) {
       r[it.type].push(it);
     });
   } catch (e) {}
-  return { impaye, impayes, parRef };
+  return { impaye, impayes, parRef, indisponible };
 }
 function _renderPilMatrice(ctx) {
   const { scopeLogs, yr, activeEnt } = ctx;
@@ -8461,6 +8478,7 @@ function _renderPilMatrice(ctx) {
   const tete = '<div class="pil-mtx-h"><b>Pilotage du parc</b>'
     + (famF ? '<button type="button" class="fchip" data-pilclearfam="1">' + esc(famF.lbl) + ' ✕</button>' : '')
     + '<span class="cnt">' + nKo + ' lot' + (nKo > 1 ? 's' : '') + ' à traiter sur ' + nTot + '</span>'
+    + (refs.indisponible ? '<span class="cnt">' + _uiIcon('warn', 13) + ' paiements : calcul indisponible</span>' : '')
     + '<span class="pil-hint">' + _PIL_MARK_HTML + ' à faire · vide = rien</span>'
     + '<span class="fl">' + [['tous', 'Tous'], ['ko', 'À faire'], ['vac', 'Vacants']].map(k =>
       '<button type="button" data-pilfl="' + k[0] + '" aria-pressed="' + (_pilMtxFilter === k[0]) + '">' + k[1] + '</button>').join('') + '</span></div>';
@@ -9843,18 +9861,18 @@ function _computeUnifiedTodo(ctx) {
     if(!c) return;
     if(c.etat === 'applicable') {
       out.push({
-        type:'irl', severity:'ora', score:70, irlEtat:'applicable', dateAnniv:c.dateAnniv, hc:l.hc, nouveauHC:rev.nouveauHC,
+        type:'irl', severity:'ora', score:70, irlEtat:'applicable', dateAnniv:c.dateAnniv, hc:(rev.ancienHC!=null?rev.ancienHC:l.hc), nouveauHC:rev.nouveauHC,
         title:'Révision IRL applicable',
-        subtitle:_logLabel(l.ref)+' — '+fmt(l.hc)+' → '+fmt(rev.nouveauHC),
+        subtitle:_logLabel(l.ref)+' — '+fmt(rev.ancienHC!=null?rev.ancienHC:l.hc)+' → '+fmt(rev.nouveauHC),
         contextRef:l.ref, nom:_logLabel(l.ref),
         actionLabel:'Appliquer',
         actionFn:"go('irl',null)"
       });
     } else {
       out.push({
-        type:'irl', severity:'info', score:60, irlEtat:'preavis', dateAnniv:c.dateAnniv, hc:l.hc, nouveauHC:rev.nouveauHC,
+        type:'irl', severity:'info', score:60, irlEtat:'preavis', dateAnniv:c.dateAnniv, hc:(rev.ancienHC!=null?rev.ancienHC:l.hc), nouveauHC:rev.nouveauHC,
         title:'Révision IRL dans '+c.jours+' j',
-        subtitle:_logLabel(l.ref)+' — '+fmt(l.hc)+' → '+fmt(rev.nouveauHC),
+        subtitle:_logLabel(l.ref)+' — '+fmt(rev.ancienHC!=null?rev.ancienHC:l.hc)+' → '+fmt(rev.nouveauHC),
         contextRef:l.ref, nom:_logLabel(l.ref),
         actionLabel:'Préparer',
         actionFn:"go('irl',null)"
@@ -10401,7 +10419,10 @@ function _computeImpayes(ctx) {
   // Accueil = Finances au centime PAR CONSTRUCTION (invariant testé).
   //  - Instant T (mo vide, cas Accueil/Pilotage) : arriéré ANNUEL du lot (report N-1 inclus).
   //  - Mois précis sélectionné : résidu de CE mois (colonne P&L du maître).
-  if (typeof _finMonthly !== 'function') return { count: 0, totalDue: 0, items: [] };
+  // AUDIT AVANT BÊTA (lot D, « 0 € muets ») : moteur absent, en échec ou sans réponse → `indisponible: true`. Les
+  // surfaces le DISENT (« calcul indisponible ») ; elles n'affichent jamais « 0 impayé » ni « à jour » sur une panne.
+  const _indispo = { count: 0, totalDue: 0, items: [], indisponible: true };
+  if (typeof _finMonthly !== 'function') return _indispo;
   const today = (typeof window._loyerTodayLocal === 'function') ? window._loyerTodayLocal() : new Date().toISOString().slice(0, 10);
   const refY = mo ? parseInt(yr, 10) : parseInt(today.slice(0, 4), 10);
   let byLot = {};
@@ -10409,8 +10430,13 @@ function _computeImpayes(ctx) {
     const scope = (typeof _finEntScope === 'function') ? _finEntScope(activeEnt || '', '') : null;
     const W = (typeof _finWindows === 'function') ? _finWindows(refY, scope) : null;
     const r = _finMonthly(refY, scope, W ? W.constat : undefined);
-    if (r && r.byLot) byLot = r.byLot;
-  } catch (e) {}
+    if (!r || !r.byLot) return _indispo;
+    byLot = r.byLot;
+  } catch (e) { console.error('[Impayés] calcul indisponible (moteur Finances en échec)', e); return _indispo; }
+  // Relecture Opus : le suivi d'UN lot peut planter (bail mal formé) — `_finSuiviLot` l'inscrit dans `_finSuiviEchecs` et le
+  // moteur le compte à 0. Un lot du périmètre en échec rend le résultat INCOMPLET : dit, jamais « à jour ».
+  const _echecs = (typeof window !== 'undefined' && window._finSuiviEchecs) || {};
+  const _partiel = (scopeLogs || []).some(l => l && Object.prototype.hasOwnProperty.call(_echecs, l.ref));
   let count = 0, totalDue = 0;
   const items = [];
   // R0-B — PLUS DE FILTRE SUR `l.locataire`. Cette façade annonce « Accueil = Finances au
@@ -10459,7 +10485,8 @@ function _computeImpayes(ctx) {
     }
     if (reste > 0.5) { count++; totalDue += reste; items.push({ ref: l.ref, locataire: _nom || '(locataire non renseigné)', reste, attendu, enc, depuisYm }); }
   });
-  return { count, totalDue: Math.round(totalDue * 100) / 100, items };
+  return _partiel ? { count, totalDue: Math.round(totalDue * 100) / 100, items, indisponible: true }
+    : { count, totalDue: Math.round(totalDue * 100) / 100, items };
 }
 
 /* Drill-down tableau complet "À traiter" — groupé par sévérité. */
@@ -23813,6 +23840,16 @@ function _congeDocHtml(ref){
   // BAUX-ECHUS — titre, fondement et annexe 15-II selon le type de bail (l'annexe 15-II : bail NU seulement).
   var _M=_congeModele(ref);
   if(_congeState.kind==='conge_bailleur' && _M.annexe15II && v('cg-motif')==='vente') corps+=window.art15IIProDoc();
+  // F-4 (décision Didier 17/10) — la NOTICE D'INFORMATION de l'arrêté du 13/12/2017 (art. 15-I) est jointe d'office au
+  // congé du bail NU pour reprise ou pour vente (js/core/conge-notice.js, texte officiel mot pour mot). Module absent
+  // (file://) : un marqueur NOMMÉ prend sa place — jamais un congé qui part sans elle en silence.
+  if(_congeState.kind==='conge_bailleur' && _M.motif){
+    var _motifN=v('cg-motif')||'reprise', _typeN=_congeTypeBail(ref);
+    var _requise=(typeof window.noticeCongeRequise==='function') ? window.noticeCongeRequise({ typeBail:_typeN, motif:_motifN })
+      : (_typeN==='nu' && (_motifN==='reprise' || _motifN==='vente'));
+    if(_requise) corps += (typeof window.noticeCongeProDoc==='function') ? window.noticeCongeProDoc()
+      : '<p>\u2039notice d\'information de l\'arrêté du 13 décembre 2017 à joindre\u203a</p>';
+  }
   var TIT={conge_bailleur:_M.titre,conge_locataire:'Accusé de réception d\'un préavis',mise_demeure:'Mise en demeure de payer',resiliation_amiable:'Protocole de résiliation amiable'};
   var LEG={conge_bailleur:_M.fondement,conge_locataire:'Loi n° 89-462 du 6 juillet 1989, articles 12 et 15',mise_demeure:'Loi n° 89-462 du 6 juillet 1989, article 24 (clause résolutoire)',resiliation_amiable:'Article 1193 du code civil'};
   return _docPage(ent,{titre:TIT[_congeState.kind],ctx:LEG[_congeState.kind],corps:corps,ref:escHtml(ref),date:'',withStyle:false});
@@ -24712,7 +24749,19 @@ function computeIRLRevision(log, opts) {
 
   const dateRevision = new Date(cal.effetPrevuIso + 'T00:00:00');   // D12 : 1er du mois
   const variation    = (valN - valN1) / valN1;
-  const nouveauHC    = Math.round(log.hc * valN / valN1 * 100) / 100;
+  // O6 (audit avant bêta, lot D) — la base est le loyer EN VIGUEUR la veille de l'effet (barème : une correction
+  // manuelle datée y vit), plus `log.hc`. Repli sur le lot sans barème (comportement d'avant).
+  //   Relecture Fable : la veille de la date d'effet QUI SERA PROPOSÉE — une révision en retard prend effet à compter de
+  //   la demande (art. 17-1) : la base est alors le loyer en vigueur à cette date (correction de juin comprise), jamais
+  //   celui de l'anniversaire (sinon la « révision » baissait le loyer corrigé).
+  const _effBase = (_aProposer && typeof window !== 'undefined' && typeof window._baremeComputeDateEffetIRL === 'function'
+      && typeof _dernierMoisQuittanceYm === 'function')
+    ? (window._baremeComputeDateEffetIRL({ anniversaireIso: cal.effetPrevuIso, validationIso: today, dernierMoisQuittanceYm: _dernierMoisQuittanceYm(log.ref) }).effetIso || cal.effetPrevuIso)
+    : cal.effetPrevuIso;
+  const ancienHC     = (typeof window !== 'undefined' && typeof window._loyerBaseRevisionHC === 'function')
+    ? window._loyerBaseRevisionHC(DB.loyerBareme || [], log.ref, _effBase, log.hc, debut)
+    : (Number(log.hc) || 0);
+  const nouveauHC    = Math.round(ancienHC * valN / valN1 * 100) / 100;
   // R5 — PROGRAMMÉE (validée, effet à venir) compte comme traitée : plus proposée, plus comptée,
   // plus d'alerte ; le loyer courant reste facturé jusqu'à la date d'effet.
   const dejaApplique = (cal.etat === 'faite' || cal.etat === 'programmee');
@@ -24733,8 +24782,8 @@ function computeIRLRevision(log, opts) {
     T, N,
     irlRef:      { key: `T${T} ${N-1}`, val: valN1 },
     irlVigueur:  { key: `T${T} ${N}`,   val: valN  },
-    dateRevision, premiereAnniv: premiereAnnivD, variation, nouveauHC,
-    diff:        dejaApplique ? 0 : nouveauHC - log.hc,
+    dateRevision, premiereAnniv: premiereAnnivD, variation, nouveauHC, ancienHC,
+    diff:        dejaApplique ? 0 : nouveauHC - ancienHC,
     isApplicable, dejaApplique, renonce, dpe, dpeExpire,
     // D23/I16 — pastille informative « DPE à compléter » (absent ou périmé) sur une révision
     // par ailleurs PROPOSABLE. Ne retient rien (le seul verrou DPE est le gel F/G ci-dessus).
@@ -25039,13 +25088,22 @@ function _gfGainCycle(log, rev) {
   const _ai = (_C && typeof _C.anneeIndice === 'function') ? _C.anneeIndice(rev.T, rev.perdue.effetIso) : null;
   const a = (_ai != null) ? _ai : rev.perdue.annee;
   const v = irlVal(rev.T, a), v1 = irlVal(rev.T, a - 1);
-  return (v && v1 && log && log.hc) ? Math.round((log.hc * v / v1 - log.hc) * 100) / 100 : null;
+  const base = _gfBaseAujourdhui(log);
+  return (v && v1 && base) ? Math.round((base * v / v1 - base) * 100) / 100 : null;
+}
+/** O6 — le loyer EN VIGUEUR aujourd'hui (barème), base d'un cycle éteint appliqué aujourd'hui ; repli log.hc. */
+function _gfBaseAujourdhui(log) {
+  if (!log) return 0;
+  const bail = DB.baux && DB.baux[log.ref];
+  return (typeof window !== 'undefined' && typeof window._loyerBaseRevisionHC === 'function')
+    ? window._loyerBaseRevisionHC(DB.loyerBareme || [], log.ref, _todayIsoLocal(), log.hc, (bail && !bail._deleted && bail.debut) || log.debut || null)
+    : (Number(log.hc) || 0);
 }
 
 /** Le nouveau loyer d'un cycle éteint appliqué aujourd'hui : les indices DE CE CYCLE. */
 function _gfHcCycleEteint(log, rev) {
   const g = _gfGainCycle(log, rev);
-  return (g != null && log) ? Math.round((log.hc + g) * 100) / 100 : null;
+  return (g != null && log) ? Math.round((_gfBaseAujourdhui(log) + g) * 100) / 100 : null;
 }
 
 /**
@@ -25209,7 +25267,7 @@ function applyIRL(ref, newHC, opts) {
   _irlValidCtx = { ref, newHC };
   el('iv-sub').textContent = _logLabel(ref) + (log.locataire ? ' — ' + log.locataire : '');
   el('iv-move').innerHTML = `<div class="bv-row"><span class="bv-lbl">Loyer hors charges</span>
-    <span class="hl-move" style="margin-top:0"><span class="old">${fmt(log.hc)}</span><span>→</span><span class="new">${fmt(newHC)}</span></span></div>`;
+    <span class="hl-move" style="margin-top:0"><span class="old">${fmt(rev && rev.ancienHC != null ? rev.ancienHC : log.hc)}</span><span>→</span><span class="new">${fmt(newHC)}</span></span></div>`;
   el('iv-effet').value = dateEffetIso;
   // IRL-REVISION R2 — la date pré-remplie EST le minimum légal (date de révision, demande, mois
   // quittancé) : le sélecteur ne propose rien avant. Plus tard reste possible.
@@ -25335,7 +25393,24 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
   }
   const todayLocal = _todayIsoLocal();
   const futureApplication = dateEffetIso > todayLocal;
-  const ancienHC = log.hc;                   // capturé AVANT toute mutation (M1 audit)
+  // capturé AVANT toute mutation (M1 audit). O6 : le loyer EN VIGUEUR la veille de l'effet (barème), plus log.hc.
+  const ancienHC = (typeof window !== 'undefined' && typeof window._loyerBaseRevisionHC === 'function')
+    ? window._loyerBaseRevisionHC(DB.loyerBareme || [], ref, dateEffetIso, log.hc,
+        (DB.baux[ref] && !DB.baux[ref]._deleted && DB.baux[ref].debut) || log.debut || null)
+    : log.hc;
+  // Relecture Fable (n° 1) — la date retenue dans la fenêtre peut être plus tardive que celle proposée : le nouveau loyer
+  // suit la MÊME base (barème de la veille de l'effet retenu), avec la variation des indices du cycle. Jamais une
+  // « révision » qui baisserait un loyer corrigé entre-temps ; l'écart éventuel est dit.
+  {
+    const _vr = Number(_iRef && _iRef.val), _vv = Number(_iVig && _iVig.val);
+    if (_vr > 0 && _vv > 0 && Number(ancienHC) > 0) {
+      const _recalc = Math.round(Number(ancienHC) * _vv / _vr * 100) / 100;
+      if (Math.abs(_recalc - Number(newHC)) > 0.005) {
+        showToast(`Loyer en vigueur avant le ${fd(dateEffetIso)} : ${fmt(ancienHC)} — nouveau loyer recalculé à ${fmt(_recalc)} (même variation de l'IRL).`, 'info', 9000);
+        newHC = _recalc;
+      }
+    }
+  }
   if (!DB.irlHistorique) DB.irlHistorique = [];
   // RETOURS 15/10 (lot 1, point 2) — GARDE ANTI-DOUBLON : même lot + même indice + même date
   // d'effet = la même révision (double clic, deux appareils, rejeu). Aucune nouvelle entrée : la
@@ -26012,9 +26087,11 @@ function _rgN1Charges(ref){
 // régularisation (anti-double-compte).
 // `quoi` = 'charge' : les CHARGES dues de la même occupation (elles se règlent à la régularisation, jamais par le dépôt —
 // décision Didier 17/10) ; défaut : le loyer HC.
+// Lot D (« 0 € muets ») : suivi des loyers absent ou en échec → null = dette INCONNUE. Chaque appelant le DIT
+// (« calcul indisponible ») au lieu d'imprimer 0 € sur un solde de tout compte ou une restitution de dépôt.
 function _rgClotureImpayes(ref, from, to, quoi){
   const s = (typeof _finSuiviLot==='function') ? _finSuiviLot(ref, { sansRetenue: true }) : null;
-  if(!s) return 0;
+  if(!s) return null;
   const f10 = from ? String(from).slice(0,10) : null, t10 = to ? String(to).slice(0,10) : null;
   const f7 = f10 ? f10.slice(0,7) : null, t7 = t10 ? t10.slice(0,7) : null;
   let total = 0;
@@ -26127,7 +26204,9 @@ function _rgClotureCompute(entryKey){
   // DÉPÔT DÉTENU (17/10, relecture Opus) : un seul solde avec la restitution — la retenue pour loyer DÉCIDÉE fait foi
   // (même règle que _calculerSoldeDG), sinon les loyers dus du moteur.
   const _rlDec = (typeof window !== 'undefined' && typeof window._dgRetenueLoyerDecidee === 'function') ? window._dgRetenueLoyerDecidee(bail) : null;
-  const impayes = (_rlDec != null) ? _rlDec : _rgClotureImpayes(entry.ref, entry.debutOcc, entry.finOcc);
+  const _impCalc = (_rlDec != null) ? _rlDec : _rgClotureImpayes(entry.ref, entry.debutOcc, entry.finOcc);
+  const impayesIndispo = (_impCalc == null);          // lot D : suivi des loyers en échec → dit, jamais 0 € muet
+  const impayes = impayesIndispo ? 0 : _impCalc;
   const reparations = Math.round((Number((bail.depart||{}).reparations)||0)*100)/100;
   const regulDu = du;                          // dû sur la régul (0 si trop-perçu)
   const regulCredit = solde > 0 ? solde : 0;   // trop-perçu de charges → à restituer
@@ -26145,7 +26224,13 @@ function _rgClotureCompute(entryKey){
   const restitTotal = Math.round(((dg - covered) + regulCredit)*100)/100;    // à restituer maintenant
   const resteADemander = Math.round(Math.max(0, totalDu - covered)*100)/100; // reste dû (régul après arrêté en copro)
   return { entry, bail, log, dg, reg, n1, occN, occNonForfait, forfaitAvs, winDays, excl, baseN1, estCharges, prov, real, acompte, estimated, chargesUsed, solde, du, max20, retenueSugg, dgRestit,
-           impayes, reparations, regulDu, regulCredit, knownDebts, totalDu, retenueRegul, covered, restitTotal, resteADemander };
+           impayes, impayesIndispo, reparations, regulDu, regulCredit, knownDebts, totalDu, retenueRegul, covered, restitTotal, resteADemander };
+}
+// Lot D — la ligne « Loyers & charges impayés » du solde de tout compte. Impayés inconnus (suivi des loyers en échec) :
+// « calcul indisponible », et les totaux qui suivent sont dits SANS eux — jamais un « aucun · 0,00 € » inventé.
+function _rgImpayesLigneHtml(impayes, indispo, f){
+  if(indispo) return '<div class="rgc-l"><span>Loyers &amp; charges impayés <span class="mu sm">· calcul indisponible : les totaux ci-dessous ne les comptent pas — recharger l\'application avant de remettre ce décompte</span></span><span class="mono">—</span></div>';
+  return '<div class="rgc-l"><span>Loyers &amp; charges impayés'+(impayes>0?'':' <span class="mu sm">· aucun</span>')+'</span><span class="mono">'+f(impayes)+'</span></div>';
 }
 
 function _rgClotureLocataire(entryKey){
@@ -26154,7 +26239,7 @@ function _rgClotureLocataire(entryKey){
   const entry=c.entry, dg=c.dg, reg=c.reg, n1=c.n1, occN=c.occN, occNonForfait=(c.occNonForfait!=null?c.occNonForfait:c.occN), winDays=c.winDays, excl=c.excl,
         baseN1=c.baseN1, estCharges=c.estCharges, prov=c.prov, real=c.real, acompte=c.acompte, estimated=c.estimated,
         solde=c.solde, du=c.du, max20=c.max20, retenueSugg=c.retenueSugg, dgRestit=c.dgRestit,
-        impayes=c.impayes, reparations=c.reparations, regulDu=c.regulDu, regulCredit=c.regulCredit,
+        impayes=c.impayes, impayesIndispo=!!c.impayesIndispo, reparations=c.reparations, regulDu=c.regulDu, regulCredit=c.regulCredit,
         knownDebts=c.knownDebts, totalDu=c.totalDu, retenueRegul=c.retenueRegul, covered=c.covered,
         restitTotal=c.restitTotal, resteADemander=c.resteADemander;
   const f = fmt;
@@ -26213,7 +26298,7 @@ function _rgClotureLocataire(entryKey){
     <div class="m-body">
       <div class="mu sm" style="margin-bottom:12px">Occupation ${entry.debutOcc?fd(entry.debutOcc):'—'} → sortie ${entry.fin?fd(entry.fin):'—'} · ${escHtml(entry.imm||'')} (${escHtml(reg.label)})</div>
       <div class="rgc-blk"><div class="rgc-t">① Ce que le locataire doit au départ</div>
-        <div class="rgc-l"><span>Loyers &amp; charges impayés${impayes>0?'':' <span class="mu sm">· aucun</span>'}</span><span class="mono">${f(impayes)}</span></div>
+        ${_rgImpayesLigneHtml(impayes, impayesIndispo, f)}
         <div class="rgc-l"><span>Réparations locatives <span class="mu sm">· état des lieux de sortie</span></span><span class="mono"><input type="number" min="0" step="1" value="${reparations}" data-ek="${escHtml(entryKey)}" onchange="_rgSetReparations(this.dataset.ek,this.value)" style="width:76px;text-align:right"> €</span></div>
         <div class="rgc-l"><span>Régularisation des charges <span class="mu sm">· détail ci-dessous</span></span><span class="mono">${regulCredit>0?('− '+f(regulCredit)+' (crédit)'):f(regulDu)}</span></div>
         <div class="rgc-l tot"><span><b>= Total dû par le locataire</b></span><span class="mono"><b>${f(totalDu)}</b></span></div>
@@ -26328,6 +26413,8 @@ function _rgApplyRetenue(entryKey, retenue, restit){
   entry.bail.dgRetenu = Math.round((reparations + retenueRegul)*100)/100;
   // Fin d'occupation résolue par computeRegul (_bailFinOccupation : tacite reconduction) — pas la fin contractuelle.
   const sd = (typeof _calculerSoldeDG==='function') ? _calculerSoldeDG(Object.assign({}, entry.bail, { fin: entry.fin }), DB.mouvements||[]) : null;
+  // Lot D : loyers dus inconnus (suivi en échec) → la restitution enregistrée n'en déduit aucun. Avertir, jamais bloquer.
+  if(sd && sd.loyerIndisponible && !confirm2('Loyers dus : calcul indisponible (suivi des loyers en échec).\n\nLa restitution enregistrée ne déduira aucun loyer impayé. Enregistrer quand même ?')) return;
   entry.bail.dgRestitue = sd ? sd.soldeRestitue
     : Math.max(0, Math.round((_dgVerseMontant(entry.bail) - entry.bail.dgRetenu)*100)/100);
   if(typeof _stamp==='function') _stamp(entry.bail); // v15.x : horodatage pour merge multi-device (cohérence convention bail)
