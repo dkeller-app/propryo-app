@@ -118,12 +118,12 @@
   .imsb-doc-note{background:var(--accent-soft);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;font-weight:600;margin:0 0 14px}
   .imsb-doc-note[hidden]{display:none}
   .imsb-flabel{font-size:11.5px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
-  .imsb-input{width:100%;border:1.5px solid var(--line);border-radius:var(--r);padding:11px 13px;font-size:14px;margin-bottom:11px;font-family:inherit;background:var(--surface-2);color:var(--ink);transition:.15s}
+  .imsb-input{width:100%;border:1.5px solid var(--line);border-radius:var(--r);padding:11px 13px;font-size:16px;margin-bottom:11px;font-family:inherit;background:var(--surface-2);color:var(--ink);transition:.15s}
   .imsb-input::placeholder{color:var(--ink-3)}
   .imsb-input:focus{outline:none;border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px var(--accent-soft)}
   .imsb-forgot{text-align:right;margin:-2px 0 13px}
-  .imsb-forgot a{font-size:12px;color:var(--accent);font-weight:700;text-decoration:none}
-  .imsb-btn{width:100%;border:none;cursor:pointer;font-family:inherit;font-size:14.5px;font-weight:700;border-radius:var(--r);padding:12px;display:flex;align-items:center;justify-content:center;gap:9px;transition:.18s}
+  .imsb-forgot a{font-size:12px;color:var(--accent);font-weight:700;text-decoration:none;display:inline-block;padding:14px 0;margin:-14px 0}   /* cible >= 44 px sans décaler la carte */
+  .imsb-btn{width:100%;border:none;cursor:pointer;font-family:inherit;font-size:14.5px;font-weight:700;border-radius:var(--r);padding:12px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:9px;transition:.18s}
   .imsb-primary{background:var(--accent);color:var(--accent-on);box-shadow:var(--btn-shadow)}
   .imsb-primary:hover{background:var(--accent-2);transform:translateY(-1px)}
   .imsb-primary:disabled{opacity:.7;cursor:default;transform:none}
@@ -287,3 +287,15 @@
   .imsb-remember{display:flex;gap:10px;align-items:flex-start;margin:2px 0 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);line-height:1.3}
   .imsb-remember input{width:16px;height:16px;margin:2px 0 0;flex-shrink:0;accent-color:var(--accent);cursor:pointer}
   .imsb-remember small{display:block;font-weight:500;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+
+  /* ===== MOT DE PASSE OUBLIÉ (v15.774) : panneau #imsb-recup, dans la carte, mêmes composants que la connexion ===== */
+  #imsb-recup[hidden],#imsb-recup [hidden]{display:none!important}
+  .imsb-recup-etape{display:flex;flex-direction:column}
+  .imsb-recup-adr{font-size:13px;color:var(--ink-2);margin:0 0 10px;display:flex;flex-wrap:wrap;align-items:center;gap:0 8px;overflow-wrap:anywhere}
+  .imsb-recup-adr b{color:var(--ink);font-weight:700}
+  .imsb-recup-adr a{color:var(--accent);font-weight:700;text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+  .imsb-recup-code{font-size:20px;letter-spacing:.3em;font-variant-numeric:tabular-nums}
+  .imsb-recup-code::placeholder{letter-spacing:normal;font-size:16px}
+  .imsb-recup-user{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;opacity:0;overflow:hidden;clip:rect(0 0 0 0);pointer-events:none}
+  #imsb-recup .imsb-ok,#imsb-recup .imsb-err{line-height:1.45}
+  #imsb-recup-retour{margin-top:10px}

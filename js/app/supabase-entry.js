@@ -23,6 +23,8 @@ import { makeDetUuid } from '../core/det-uuid.js'   // P0-4 : id d'audit DÉTERM
 // LE lecteur du DB vivant (getter d'abord, repli sur le miroir, try/catch). Ce fichier portait déjà
 // le bon geste à la main ; on appelle le helper testé plutôt que d'en garder deux copies.
 import { appDbFrom } from '../core/utils.js'
+// MOT DE PASSE OUBLIÉ (v15.774) : règles pures de l'écran (validation, délai de renvoi, classement des erreurs).
+import * as _mdpOublie from '../core/mot-de-passe-oublie.js'
 // CANDIDATURES-CONFORMITE : garde de forme des chemins envoyés à la suppression Storage (testée).
 import { cheminFichierCandidatValide, estCleNue } from '../core/candidature-purge.js'
 
@@ -1120,9 +1122,10 @@ function wireLoginForm(api, overlay, prefillEmail) {
     try { window.__immoCrumb && window.__immoCrumb('login-ok') } catch (_e) {}
     onLoggedIn(api, overlay, r.user)
   }
+  // v15.774 MOT DE PASSE OUBLIÉ — par code à 6 chiffres, dans la même carte (ouvrirRecuperation).
   q('#imsb-forgot').onclick = (e) => {
     e.preventDefault()
-    showError(overlay, 'Le « mot de passe oublié » nécessite un email (SMTP) à configurer — bientôt. Pour l\'instant, le mot de passe se définit côté dashboard.')
+    ouvrirRecuperation(api, overlay)
   }
   if (prefillEmail) q('#imsb-email').value = prefillEmail
   // v15.422 BUG-LOGIN-PREMIERE-CONNEXION — l'utilisateur a cliqué « Se connecter » PENDANT le
@@ -1139,6 +1142,163 @@ function wireLoginForm(api, overlay, prefillEmail) {
     }
   }
 }
+
+// ── MOT DE PASSE OUBLIÉ (v15.774) ─────────────────────────────────────────────────────────────
+// Panneau #imsb-recup posé DANS la carte de connexion (#imsb-left), à la place du formulaire #imsb-form (masqué, pas
+// détruit : « Retour à la connexion » le rend tel quel). Règles et messages : js/core/mot-de-passe-oublie.js (testé).
+// Étape 1 : adresse → code (message identique que le compte existe ou non). Étape 2 : code + nouveau mot de passe ×2
+// → verifyOtp(recovery) → updateUser → onLoggedIn. Un compte LOCATAIRE SEUL n'obtient pas de mot de passe.
+// Exportée pour la vérification visuelle (harnais local, api simulée) ; aucun autre appelant.
+export function ouvrirRecuperation(api, overlay) {
+  const left = overlay.querySelector('#imsb-left'), form = overlay.querySelector('#imsb-form')
+  if (!left || !form) return
+  const MP = _mdpOublie
+  const ancien = left.querySelector('#imsb-recup'); if (ancien) ancien.remove()
+  showError(overlay, '')
+  overlay.classList.add('imv-auth-open')
+  const p = document.createElement('form')
+  p.id = 'imsb-recup'; p.className = 'imsb-mid'; p.setAttribute('autocomplete', 'on'); p.noValidate = true
+  p.innerHTML = `
+    <h2 class="imsb-h2">Mot de passe oublié</h2>
+    <p class="imsb-lead" id="imsb-recup-lead">Recevoir un code par e-mail, puis choisir un nouveau mot de passe.</p>
+    <div class="imsb-ok" id="imsb-recup-ok" role="status" hidden></div>
+    <div class="imsb-err" id="imsb-recup-err" role="alert" hidden></div>
+    <div class="imsb-recup-etape" id="imsb-recup-e1">
+      <label class="imsb-flabel" for="imsb-recup-email">Email</label>
+      <input class="imsb-input" id="imsb-recup-email" type="email" placeholder="nom@exemple.fr" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false">
+      <button class="imsb-btn imsb-primary" id="imsb-recup-envoyer" type="submit">Recevoir un code</button>
+    </div>
+    <div class="imsb-recup-etape" id="imsb-recup-e2" hidden>
+      <p class="imsb-recup-adr">Adresse : <b id="imsb-recup-adr"></b> <a href="#" id="imsb-recup-changer">Modifier</a></p>
+      <input type="email" id="imsb-recup-user" autocomplete="username" tabindex="-1" aria-hidden="true" class="imsb-recup-user" readonly>
+      <label class="imsb-flabel" for="imsb-recup-code">Code reçu par e-mail</label>
+      <input class="imsb-input imsb-recup-code" id="imsb-recup-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="6 chiffres" spellcheck="false">
+      <label class="imsb-flabel" for="imsb-recup-mdp">Nouveau mot de passe</label>
+      <input class="imsb-input" id="imsb-recup-mdp" type="password" autocomplete="new-password" minlength="${MP.MDP_MIN}" placeholder="${MP.MDP_MIN} caractères minimum">
+      <label class="imsb-flabel" for="imsb-recup-mdp2">Confirmer le mot de passe</label>
+      <input class="imsb-input" id="imsb-recup-mdp2" type="password" autocomplete="new-password" minlength="${MP.MDP_MIN}" placeholder="Le même, une seconde fois">
+      <label class="imsb-remember" id="imsb-recup-remember-row"><input type="checkbox" id="imsb-recup-remember"><span>Rester connecté sur cet appareil<small>Ne pas cocher sur un ordinateur partagé ou public.</small></span></label>
+      <button class="imsb-btn imsb-primary" id="imsb-recup-valider" type="submit">Enregistrer et se connecter</button>
+      <button class="imsb-btn imsb-ghost" id="imsb-recup-renvoyer" type="button">Renvoyer le code</button>
+    </div>
+    <button class="imsb-btn imsb-ghost" id="imsb-recup-retour" type="button">← Retour à la connexion</button>`
+  form.style.display = 'none'
+  left.appendChild(p)
+  const $ = (s) => p.querySelector(s)
+  const e1 = $('#imsb-recup-e1'), e2 = $('#imsb-recup-e2'), ok = $('#imsb-recup-ok'), err = $('#imsb-recup-err')
+  const btnEnv = $('#imsb-recup-envoyer'), btnVal = $('#imsb-recup-valider'), btnRenv = $('#imsb-recup-renvoyer')
+  const st = { etape: 1, email: '', dernierEnvoi: 0, minuterie: null, sessionRecup: false, occupe: false }
+  const dire = (msgOk, msgErr) => {
+    ok.textContent = msgOk || ''; ok.hidden = !msgOk
+    err.textContent = msgErr || ''; err.hidden = !msgErr
+  }
+  const occuper = (b, libelle) => {
+    st.occupe = !!b
+    const btn = st.etape === 1 ? btnEnv : btnVal
+    btn.disabled = !!b
+    btn.innerHTML = b ? `<span class="imsb-spin imsb-spin-sm"></span> ${escapeHtml(libelle)}` : (st.etape === 1 ? 'Recevoir un code' : 'Enregistrer et se connecter')
+  }
+  const majRenvoi = () => {
+    const s = MP.secondesAvantRenvoi(st.dernierEnvoi)
+    btnRenv.disabled = s > 0 || st.occupe
+    btnRenv.textContent = s > 0 ? `Renvoyer le code (dans ${s} s)` : 'Renvoyer le code'
+    if (s <= 0 && st.minuterie) { clearInterval(st.minuterie); st.minuterie = null }
+  }
+  const armerRenvoi = () => {
+    st.dernierEnvoi = Date.now()
+    if (st.minuterie) clearInterval(st.minuterie)
+    st.minuterie = setInterval(() => { if (!p.isConnected) { clearInterval(st.minuterie); st.minuterie = null; return } majRenvoi() }, 1000)
+    majRenvoi()
+  }
+  const allerEtape = (n) => {
+    st.etape = n; e1.hidden = n !== 1; e2.hidden = n !== 2
+    $('#imsb-recup-lead').textContent = n === 1 ? 'Recevoir un code par e-mail, puis choisir un nouveau mot de passe.' : 'Saisir le code reçu et choisir un nouveau mot de passe.'
+    if (n === 2) {
+      $('#imsb-recup-adr').textContent = st.email
+      $('#imsb-recup-user').value = st.email
+      setTimeout(() => { try { $('#imsb-recup-code').focus() } catch (_e) {} }, 0)
+    } else setTimeout(() => { try { $('#imsb-recup-email').focus() } catch (_e) {} }, 0)
+  }
+  // Session de récupération ouverte mais abandonnée (retour, compte locataire) : fermée sur cet appareil.
+  const abandonner = async () => { if (st.sessionRecup) { st.sessionRecup = false; await api.signOutLocal() } }
+  const fermer = async (email) => {
+    if (st.minuterie) clearInterval(st.minuterie)
+    await abandonner()
+    p.remove(); form.style.display = ''
+    if (email) { const f = overlay.querySelector('#imsb-email'); if (f) f.value = email }
+    showError(overlay, '')
+  }
+  const envoyer = async (renvoi) => {
+    const v = MP.validerEtapeEmail(renvoi ? st.email : $('#imsb-recup-email').value)
+    if (!v.ok) { dire('', v.erreur); return }
+    if (renvoi && MP.secondesAvantRenvoi(st.dernierEnvoi) > 0) return
+    dire('', '')
+    // Pendant un renvoi, la validation est suspendue (le code saisi va être remplacé).
+    if (renvoi) { st.occupe = true; btnVal.disabled = true; btnRenv.disabled = true; btnRenv.textContent = 'Envoi…' } else occuper(true, 'Envoi…')
+    const r = await api.sendPasswordReset(v.email).catch((e) => ({ ok: false, err: e }))
+    if (renvoi) { st.occupe = false; btnVal.disabled = false } else occuper(false)
+    const k = r.ok ? 'envoye' : MP.classerErreur(r.err || r.error, 'envoi')
+    if (k !== 'envoye') { majRenvoi(); dire('', MP.MESSAGES[k] || MP.MESSAGES.autre); return }
+    st.email = v.email
+    armerRenvoi()
+    if (renvoi) { dire(MP.MESSAGES.renvoye, ''); $('#imsb-recup-code').value = '' } else { allerEtape(2); dire(MP.MESSAGES.envoye, '') }
+  }
+  const valider = async () => {
+    const v = MP.validerEtapeCode({ code: $('#imsb-recup-code').value, mdp: $('#imsb-recup-mdp').value, mdp2: $('#imsb-recup-mdp2').value })
+    if (!v.ok) {
+      dire('', v.erreur)
+      try { $({ code: '#imsb-recup-code', mdp: '#imsb-recup-mdp', mdp2: '#imsb-recup-mdp2' }[v.champ]).focus() } catch (_e) {}
+      return
+    }
+    dire('', ''); occuper(true, 'Vérification…'); majRenvoi()
+    // « Rester connecté » : choisi AVANT que la session ne soit écrite (même règle que la connexion).
+    try { if (_authStorage) _authStorage.setPersist(!!$('#imsb-recup-remember').checked) } catch (_e) {}
+    let user = null
+    if (!st.sessionRecup) {
+      const r = await api.verifyRecovery(st.email, v.code).catch((e) => ({ ok: false, err: e }))
+      _annulerChoixAuth()
+      if (!r.ok) { occuper(false); majRenvoi(); dire('', MP.messageErreur(r.err || r.error, 'code')); return }
+      st.sessionRecup = true; user = r.user
+      // Compte LOCATAIRE SEUL (0065) : connexion par code depuis l'espace locataire, jamais de mot de passe ici.
+      if ((await api.estLocataireSeul()) === true) {
+        await abandonner()
+        occuper(false); e2.hidden = true; if (st.minuterie) { clearInterval(st.minuterie); st.minuterie = null }
+        dire('', MP.MESSAGES.locataire); return
+      }
+    }
+    const u = await api.updatePassword($('#imsb-recup-mdp').value).catch((e) => ({ ok: false, err: e }))
+    if (!u.ok) {
+      occuper(false); majRenvoi()
+      // Le code a servi : la session de récupération reste ouverte, un nouvel essai ne redemande que le mot de passe.
+      dire('', MP.messageErreur(u.err || u.error, 'mdp')); return
+    }
+    st.sessionRecup = false
+    if (st.minuterie) { clearInterval(st.minuterie); st.minuterie = null }
+    try { window.__immoCrumb && window.__immoCrumb('recup-ok') } catch (_e) {}
+    dire(MP.MESSAGES.succes, '')
+    try { if (typeof window.showToast === 'function') window.showToast(MP.MESSAGES.modifie, '', 5000) } catch (_e) {}
+    onLoggedIn(api, overlay, u.user || user)
+  }
+  p.onsubmit = (ev) => { ev.preventDefault(); if (st.occupe) return; (st.etape === 1 ? envoyer(false) : valider()) }
+  btnRenv.onclick = () => { if (!st.occupe) envoyer(true) }
+  $('#imsb-recup-retour').onclick = () => fermer(st.email || normaliserSaisie($('#imsb-recup-email').value))
+  $('#imsb-recup-changer').onclick = async (ev) => {
+    ev.preventDefault(); await abandonner()
+    $('#imsb-recup-email').value = st.email; allerEtape(1); dire('', '')
+  }
+  // Code collé (« 123 456 ») : chiffres seulement.
+  $('#imsb-recup-code').addEventListener('input', (ev) => { const c = MP.normaliserCode(ev.target.value); if (c !== ev.target.value) ev.target.value = c })
+  // « Rester connecté » : même règle que l'écran de connexion (masqué dans l'application installée, jamais hérité
+  // d'une autre personne : on reprend seulement la case que la personne vient de cocher sur l'écran de connexion).
+  try {
+    const row = $('#imsb-recup-remember-row'), box = $('#imsb-recup-remember'), src = overlay.querySelector('#imsb-remember')
+    if (!_authStorage || _authStorage.isStandalone()) row.hidden = true
+    else box.checked = !!(src && src.checked)
+  } catch (_e) {}
+  $('#imsb-recup-email').value = normaliserSaisie((overlay.querySelector('#imsb-email') || {}).value)
+  allerEtape(1)
+}
+const normaliserSaisie = (v) => String(v == null ? '' : v).trim()
 
 // ── PARCOURS D'ACCEPTATION D'UNE INVITATION (?invite=<token>) ─────────────────────────────────
 // Aperçu (invitation_preview) → connexion / création de compte → accept_invitation → on enchaîne sur

@@ -51,9 +51,35 @@ export function createBoot(client) {
     const { error } = await client.auth.signInWithOAuth({ provider: 'google', options: redirectTo ? { redirectTo } : undefined })
     return error ? { ok: false, error: error.message } : { ok: true }   // déclenche une redirection
   }
+  // MOT DE PASSE OUBLIÉ (v15.774) — par CODE à 6 chiffres : le hook « Send Email » du relais n'envoie jamais de lien,
+  // donc pas de redirectTo. `err` = l'erreur supabase-js brute (status, code), classée par js/core/mot-de-passe-oublie.js.
   async function sendPasswordReset(email, redirectTo) {
     const { error } = await client.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined)
-    return error ? { ok: false, error: error.message } : { ok: true }
+    return error ? { ok: false, error: error.message, err: error } : { ok: true }
+  }
+  // Code reçu → session de récupération (l'utilisateur est connecté, il peut choisir son mot de passe).
+  async function verifyRecovery(email, token) {
+    const { data, error } = await client.auth.verifyOtp({ email, token, type: 'recovery' })
+    if (error) return { ok: false, error: error.message, err: error }
+    _memoUser(data && data.user)
+    return { ok: true, user: data && data.user }
+  }
+  async function updatePassword(password) {
+    const { data, error } = await client.auth.updateUser({ password })
+    if (error) return { ok: false, error: error.message, err: error }
+    _memoUser(data && data.user)
+    return { ok: true, user: data && data.user }
+  }
+  // Compte LOCATAIRE SEUL (0065) ? Lu sous la session même (elc_suis_locataire_seul). Fonction absente ou panne : null
+  // (l'appelant ne bloque pas : le chargement de l'app refuse de toute façon un compte locataire, MSG_COMPTE_LOCATAIRE).
+  async function estLocataireSeul() {
+    try { const { data, error } = await client.rpc('elc_suis_locataire_seul'); return error ? null : data === true } catch (e) { return null }
+  }
+  // Abandon d'une session qui vient de naître (récupération d'un compte locataire) : aucun magasin n'est encore câblé,
+  // rien à pousser ; seule la session de CET appareil est fermée.
+  async function signOutLocal() {
+    _userRecent = null
+    try { await client.auth.signOut({ scope: 'local' }) } catch (e) {}
   }
   // logout : FLUSH d'abord (pousse toute modif non encore synchronisée → pas de perte si l'utilisateur
   // se déconnecte juste après une modif), puis signOut + reset. L'app doit AUSSI annuler son timer de
@@ -266,7 +292,8 @@ export function createBoot(client) {
   async function flush(db) { return _sync ? _sync.flush(db) : null }
 
   return {
-    loginEmail, signUpEmail, loginGoogle, sendPasswordReset, logout, currentUser, onAuthChange,
+    loginEmail, signUpEmail, loginGoogle, sendPasswordReset, verifyRecovery, updatePassword, estLocataireSeul, signOutLocal,
+    logout, currentUser, onAuthChange,
     currentUserOrError, localSession,
     resolveEspace, resolveEspaces, wireStore, wireStores, hydrate, seed, markDirty, flush,
     get store() { return _store }, get sync() { return _sync }, get ctx() { return _ctx },
