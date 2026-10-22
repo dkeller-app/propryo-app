@@ -55,7 +55,10 @@ function quittanceSeuleDuMois(t, ym, loc) {
   return l.length === 1 ? l[0] : null
 }
 
-const etat = { acces: [], docs: new Map(), msgs: new Map(), relais: null, charge: false, enCours: false, dernier: 0, accesLuLe: 0, accesTenteLe: 0, echecs: new Set() }
+const etat = { acces: [], docs: new Map(), msgs: new Map(), relais: null, charge: false, enCours: false, dernier: 0, accesLuLe: 0, accesTenteLe: 0, echecs: new Set(),
+  statuts: new Map() }   // compte du locataire (0065) : acces_id → ligne elc_statuts, lue quand les comptes sont allumés
+// Comptes du locataire allumés sur le relais (EL_COMPTES, migration 0065) : invitation à usage unique + connexion par code.
+const comptes = () => !!(etat.relais && etat.relais.comptes)
 
 // ─────────────────────────── Correspondance bail (app) ↔ ligne `baux` (cloud) ───────────────────────────
 function locatairesDuBail(bail, log) {
@@ -101,6 +104,10 @@ async function chargerAcces() {
       for (const x of m) { if (!etat.msgs.has(x.acces_id)) etat.msgs.set(x.acces_id, []); etat.msgs.get(x.acces_id).push(x) }
       for (const l of etat.msgs.values()) l.sort((p, q) => String(p.cree_le).localeCompare(String(q.cree_le)))
     }
+    if ((await etatRelais()).comptes) {
+      try { etat.statuts = new Map((await a.rpc('elc_statuts', {}) || []).map((x) => [x.acces_id, x])) }
+      catch (e) { console.warn('[espace-locataire] comptes', e && e.message) }   // 0065 absente : états inconnus (« Sans accès »)
+    }
     etat.charge = true
     etat.accesLuLe = Date.now()
   } catch (e) { console.warn('[espace-locataire] accès', e && e.message) }
@@ -111,12 +118,19 @@ async function chargerDocs(bid) {
 }
 async function etatRelais() {
   if (etat.relais) return etat.relais
+  // Lu une fois ; un ÉCHEC n'est pas gardé (sinon : comptes allumés lus « éteints » et un lien 0059 créé sans le dire).
   try {
     const cfg = G('_relayCfg') ? W._relayCfg() : null
     const r = cfg ? await fetch(cfg.base + '/el/etat', { cache: 'no-store' }) : null
-    etat.relais = r && r.ok ? await r.json() : { actif: false, emails: false }
-  } catch (e) { etat.relais = { actif: false, emails: false } }
-  return etat.relais
+    if (r && r.ok) { etat.relais = { ...(await r.json()), lu: true }; return etat.relais }
+  } catch (e) { /* relais injoignable */ }
+  return { actif: false, emails: false, comptes: false, lu: false }
+}
+// Avant de tirer un lien ou une invitation : le mode (compte ou lien) DOIT être connu.
+async function modeConnu() {
+  const r = await etatRelais()
+  if (!r.lu) toast('Relais injoignable : réessayer dans un instant (rien n\'a été créé).', 'err', 6000)
+  return !!r.lu
 }
 
 // ─────────────────────────── Bloc « Espace locataire » (fiche logement, onglet Bail) ───────────────────────────
@@ -130,7 +144,44 @@ const jourLocal = () => { try { const v = G('_loyerTodayLocal') ? W._loyerTodayL
 const accesDuLocataire = (liste, nom) => liste.find((y) => EL.cleNom(y.locataire_nom) === EL.cleNom(nom)) || null
 const emailDe = (t, nom) => { if (!t) return ''; const l = locatairesDuBail(t.bail, logDe(t.ref)).find((x) => EL.cleNom(x.nom) === EL.cleNom(nom)); return (l && l.email) || '' }
 
+// ── Compte du locataire (0065) : état, actions ; téléphone = ligne courte, détail en page pleine au clic (M-16) ──
+const LIB_ACTION = { fermer: ['close', 'Fermer l\'accès', 'revoquer'], reinviter: ['send', 'Renvoyer l\'invitation', 'renouveler'], rouvrir: ['send', 'Rouvrir et inviter', 'renouveler'] }
+const telephone = () => { try { return G('_isPhone') ? !!W._isPhone() : false } catch (e) { return false } }
+const statutDe = (x) => EL.statutCompte(x, etat.statuts.get(x.id), aujourdhui(), Date.now(), fdate, fdh)
+function actionsCompte(x, st, avant) {
+  const nl = nonLus(x.id)
+  return st.actions.map((k) => { const [ic, lb, f] = LIB_ACTION[k]; return `<button type="button" class="btn bs bb" onclick="${avant || ''}EspaceLoc.${f}('${x.id}')">${ico(ic, 14)} ${lb}</button>` }).join('')
+    + `<button type="button" class="btn bs bb" onclick="${avant || ''}EspaceLoc.messages('${x.id}')">${ico('send', 14)} Messages${nl ? ' · ' + nl + ' non lu' + (nl > 1 ? 's' : '') : ''}</button>`
+}
+function grilleCompte(x, st) {
+  const acc = EL.etatAccord(x, fdh), fin = EL.finAcces(x.fin_bail, x.comptes_clos_le)
+  const nm = (etat.msgs.get(x.id) || []).length, nl = nonLus(x.id)
+  return `<div class="logf-bail-grid">
+      <div class="logf-row"><span class="logf-label">Compte</span><span class="logf-value"><span class="logf-badge ${st.badge}">${esc(st.libelle)}</span> ${esc(st.sous)}</span></div>
+      <div class="logf-row"><span class="logf-label">Quittance électronique</span><span class="logf-value">${esc(acc.texte)}</span></div>
+      <div class="logf-row"><span class="logf-label">Fin d'accès</span><span class="logf-value">${fin ? esc(fdate(fin)) : 'À la clôture des comptes + 6 mois'}</span></div>
+      <div class="logf-row"><span class="logf-label">Messages</span><span class="logf-value">${nm} message${nm > 1 ? 's' : ''}${nl ? ' · ' + nl + ' non lu' + (nl > 1 ? 's' : '') : ''}</span></div>
+    </div>`
+}
+function ligneAccesCompte(x, note) {
+  const st = statutDe(x)
+  if (telephone()) {
+    return `<button type="button" class="el-locrow el-locrow-tel" onclick="EspaceLoc.detail('${x.id}')" aria-label="${esc(x.locataire_nom + ' : ' + st.libelle)}">
+      <span class="el-locrow-tx"><b>${esc(x.locataire_nom)} <span class="logf-badge ${st.badge}">${esc(st.libelle)}</span></b><span>${esc(note || st.sous)}</span></span>${ico('chevron-right', 16)}</button>`
+  }
+  return `<div class="el-locrow"><div class="el-locrow-h"><b>${esc(x.locataire_nom)}</b></div>
+    ${note ? `<p class="el-note">${esc(note)}</p>` : ''}${grilleCompte(x, st)}
+    <div class="logf-bail-actions">${actionsCompte(x, st)}</div></div>`
+}
+// Détail d'un locataire (téléphone : page pleine via la couche commune de l'app).
+function detail(accesId) {
+  const x = etat.acces.find((a) => a.id === accesId); if (!x) return
+  const st = statutDe(x)
+  couche('ov-el-detail', x.locataire_nom, grilleCompte(x, st), actionsCompte(x, st, "closeM('ov-el-detail');"))
+}
+
 function ligneAcces(x, note) {
+  if (comptes()) return ligneAccesCompte(x, note)
   const ph = EL.phaseAcces(x.fin_bail, x.comptes_clos_le, aujourdhui())
   const lien = x.revoque_le ? 'Révoqué le ' + fdate(x.revoque_le)
     : ph === 'fini' ? 'Période de consultation terminée'
@@ -218,7 +269,9 @@ function blocInterieur(log, bail, ref) {
   }
   if (!bail && !anciennes.size) return ''
   const actifs = liste.filter((x) => !x.revoque_le).length
+  const resume = comptes() ? EL.resumeComptes(liste.map(statutDe)) : ''
   const chip = !etat.charge ? '<span class="logf-badge b-mute">Chargement…</span>'
+    : comptes() ? (resume ? `<span class="logf-badge b-ok">${esc(resume)}</span>` : '<span class="logf-badge b-mute">' + (bail ? 'Pas encore ouvert' : 'Ancienne location') + '</span>')
     : actifs ? `<span class="logf-badge b-ok">${actifs} lien${actifs > 1 ? 's' : ''} actif${actifs > 1 ? 's' : ''}</span>` : '<span class="logf-badge b-mute">' + (bail ? 'Pas encore ouvert' : 'Ancienne location') + '</span>'
   const jsRef = esc(JSON.stringify(String(ref)))
   let corps = ''
@@ -226,11 +279,11 @@ function blocInterieur(log, bail, ref) {
     const locs = locatairesDuBail(bail, log)
     corps += locs.map((l, rang) => {
       const x = accesDuLocataire(liste, l.nom)
-      if (!x) return `<div class="el-locrow"><div class="el-locrow-h"><b>${esc(l.nom)}</b><button type="button" class="btn bs bb" onclick='EspaceLoc.creer(${jsRef},${rang})'>${ico('link', 14)} Créer le lien</button></div></div>`
+      if (!x) return `<div class="el-locrow"><div class="el-locrow-h"><b>${esc(l.nom)}</b><button type="button" class="btn bs bb" onclick='EspaceLoc.creer(${jsRef},${rang})'>${comptes() ? ico('send', 14) + ' Inviter' : ico('link', 14) + ' Créer le lien'}</button></div></div>`
       return ligneAcces(x)
     }).join('')
     // Accès d'un colocataire qui n'est plus au bail (départ, nom corrigé) : jamais invisible, toujours révocable.
-    for (const x of liste) if (!locs.some((l) => EL.cleNom(l.nom) === EL.cleNom(x.locataire_nom))) corps += ligneAcces(x, 'N\'est plus colocataire de ce bail : révoquer le lien si le départ est réglé.')
+    for (const x of liste) if (!locs.some((l) => EL.cleNom(l.nom) === EL.cleNom(x.locataire_nom))) corps += ligneAcces(x, comptes() ? 'N\'est plus colocataire de ce bail : fermer l\'accès si le départ est réglé.' : 'N\'est plus colocataire de ce bail : révoquer le lien si le départ est réglé.')
     const nDocs = (etat.docs.get(bid) || []).filter((d) => !d.retire_le && (d.bail_debut || null) === debut).length
     if (liste.length) corps += blocQuittancesAuto(log, bail, r, bid, debut)
     corps += `<div class="logf-bail-actions"><button type="button" class="btn bs bb" onclick='EspaceLoc.documents(${esc(JSON.stringify(bid))},${esc(JSON.stringify(debut))})'>${ico('doc', 14)} Documents visibles${etat.docs.has(bid) ? ' · ' + nDocs : ''}</button></div>`
@@ -240,7 +293,7 @@ function blocInterieur(log, bail, ref) {
       + `<div class="logf-bail-actions"><button type="button" class="btn bs bb" onclick='EspaceLoc.documents(${esc(JSON.stringify(t.id))},${esc(JSON.stringify(t.debut))})'>${ico('doc', 14)} Documents visibles</button></div>`
   }
   return `<div class="flex-b" style="margin-bottom:10px;flex-wrap:wrap;gap:10px"><h3 class="logf-panel-title" style="margin:0">${ico('link')} Espace locataire</h3>${chip}</div>
-    <p class="logf-panel-empty" style="margin:0 0 10px;text-align:left">Un lien personnel par locataire, sans mot de passe. Les documents définitifs de ce bail y sont publiés automatiquement.</p>
+    <p class="logf-panel-empty" style="margin:0 0 10px;text-align:left">${comptes() ? 'Un accès personnel par locataire : invitation par e-mail, puis connexion par un code reçu par e-mail.' : 'Un lien personnel par locataire, sans mot de passe.'} Les documents définitifs de ce bail y sont publiés automatiquement.</p>
     ${corps}`
 }
 function blocHtml(log, bail, ref) {
@@ -282,6 +335,8 @@ async function partagerLien(jeton, nom, email, bienLabel, accesId) {
   const lien = cfg ? EL.lienEspace(cfg.base, jeton) : null
   if (!lien) { toast("Adresse du relais introuvable ou non sécurisée (https exigé) : lien non transmis.", 'err', 6000); return }
   const r = await etatRelais()
+  // Comptes allumés (0065) : le lien est une INVITATION à usage unique (30 jours), qui sert à créer l'accès.
+  if (r.comptes) return partagerInvitation(lien, jeton, nom, email, bienLabel, accesId, r)
   let info = '<b>Lien affiché une seule fois.</b> Seule son empreinte est enregistrée : pour le transmettre à nouveau plus tard, le renouveler (l\'ancien cessera de fonctionner).'
   if (r.emails && accesId) {
     const ok = await notifier('invitation', accesId, { jeton })
@@ -299,6 +354,23 @@ async function partagerLien(jeton, nom, email, bienLabel, accesId) {
     })
   }
 }
+async function partagerInvitation(lien, jeton, nom, email, bienLabel, accesId, r) {
+  let info = '<b>Lien affiché une seule fois.</b> Il sert une seule fois, pendant 30 jours, à créer l\'accès ; ensuite, connexion par un code reçu par e-mail. Lien perdu : « Renvoyer l\'invitation » (le précédent cesse de fonctionner).'
+  if (r.emails && accesId) {
+    const ok = await notifier('invitation_compte', accesId, { jeton })
+    if (ok) info = 'Invitation envoyée par e-mail à l\'adresse du bail. ' + info
+  }
+  if (W.__immoDemo === true) info = '<b>Démonstration :</b> lien fictif, la page du locataire ne s\'ouvre qu\'avec un vrai compte. ' + info
+  if (G('_openShareModal')) {
+    W._openShareModal({
+      title: 'Invitation à l\'espace locataire', ctxIcon: ico('send', 20), ctxTitle: bienLabel,
+      ctxSub: 'Locataire : <b>' + esc(nom) + '</b>', url: lien, linkLabel: 'Lien d\'invitation (une seule fois)', email: email || '',
+      subject: 'Espace locataire — ' + bienLabel,
+      message: 'Bonjour,\n\nVoici le lien pour créer l\'accès à l\'espace locataire : documents du bail, quittances, signalement d\'un problème, messages.\nLe lien sert une seule fois (30 jours) ; ensuite, la connexion se fait par un code reçu par e-mail. Ne pas le transférer.',
+      smsLead: 'Espace locataire (lien d\'invitation, une seule fois, ne pas transférer) : ', info, doneJs: 'void 0;',
+    })
+  }
+}
 async function creer(ref, rang) {
   const D = db() || {}; const bail = D.baux && D.baux[ref]; const log = logDe(String(ref).split('@@')[0])
   if (!bail) return
@@ -306,7 +378,8 @@ async function creer(ref, rang) {
   if (!(bail.locataires || []).length && !(bail.nom || (log && log.locataire))) { toast('Saisir d\'abord le nom du locataire dans le bail.', 'warn', 5000); return }
   try {
     const jeton = EL.nouveauJeton(); const h = await EL.empreinteJeton(jeton)
-    const id = await API().rpc('el_acces_emettre', { p_bail_id: bailId(ref, bail), p_rang: rang, p_nom: loc.nom, p_jeton_sha256: h })
+    if (!(await modeConnu())) return
+    const id = await API().rpc(comptes() ? 'elc_inviter' : 'el_acces_emettre', { p_bail_id: bailId(ref, bail), p_rang: rang, p_nom: loc.nom, p_jeton_sha256: h })
     await rafraichir(); majBloc()
     await partagerLien(jeton, loc.nom, loc.email, (log && (log.adr || log.ref)) || ref, id)
     publierBientot()
@@ -316,7 +389,8 @@ async function renouveler(accesId) {
   const x = etat.acces.find((a) => a.id === accesId); if (!x) return
   try {
     const jeton = EL.nouveauJeton(); const h = await EL.empreinteJeton(jeton)
-    await API().rpc('el_acces_renouveler', { p_acces_id: accesId, p_jeton_sha256: h })
+    if (!(await modeConnu())) return
+    await API().rpc(comptes() ? 'elc_reinviter' : 'el_acces_renouveler', { p_acces_id: accesId, p_jeton_sha256: h })
     await rafraichir(); majBloc()
     const t = locationDe(x); const log = t ? logDe(t.ref) : null
     await partagerLien(jeton, x.locataire_nom, emailDe(t, x.locataire_nom), (log && (log.adr || log.ref)) || '', accesId)
@@ -324,9 +398,12 @@ async function renouveler(accesId) {
 }
 async function revoquer(accesId) {
   const x = etat.acces.find((a) => a.id === accesId); if (!x) return
-  const ok = G('confirm2') ? W.confirm2('Révoquer le lien de ' + x.locataire_nom + ' ?\n\nLe lien cesse de fonctionner immédiatement, sur tous ses appareils. Les documents, messages et signalements restent enregistrés. Un nouveau lien peut être créé ensuite.') : true
+  const texte = comptes()
+    ? 'Fermer l\'accès de ' + x.locataire_nom + ' ?\n\nL\'espace ne s\'ouvre plus, sur tous ses appareils, immédiatement. Les documents, messages et signalements restent enregistrés. L\'accès peut être rouvert.'
+    : 'Révoquer le lien de ' + x.locataire_nom + ' ?\n\nLe lien cesse de fonctionner immédiatement, sur tous ses appareils. Les documents, messages et signalements restent enregistrés. Un nouveau lien peut être créé ensuite.'
+  const ok = G('confirm2') ? W.confirm2(texte) : true
   if (!ok) return
-  try { await API().rpc('el_acces_revoquer', { p_acces_id: accesId }); await rafraichir(); majBloc(); toast('Lien révoqué.') }
+  try { await API().rpc('el_acces_revoquer', { p_acces_id: accesId }); await rafraichir(); majBloc(); toast(comptes() ? 'Accès fermé.' : 'Lien révoqué.') }
   catch (e) { toast('Révocation impossible : droit insuffisant ou connexion perdue.', 'err', 5000) }
 }
 
@@ -938,12 +1015,105 @@ async function cycle(force) {
 }
 
 let _demarre = false
+// ─────────────────────────── Signature du bail depuis le compte (0067, GO Didier 21/10 : S1 à S3) ───────────────────────────
+// À l'envoi en signature (comptes allumés), chaque locataire signataire est rattaché à SON accès : sans compte actif, il
+// reçoit UN e-mail « invitation + bail à signer » (lien d'invitation à usage unique) ; compte actif, un avis « bail à
+// signer ». La session de signature est posée sur l'accès (elc_signature_poser) ; l'espace la présente en tête.
+const rangDansSession = (s, i) => { const m = /\/s\/[0-9a-f]{64}\/(\d{1,2})\./.exec(String((s && s.signUrl) || '')); return m ? Number(m[1]) : i }
+async function comptesAllumes() { const r = await etatRelais(); return !!(r.lu && r.comptes) }
+// Le relais n'accepte un passage que pour un rattachement déclaré par le PROPRIÉTAIRE de la session (jeton propriétaire).
+async function declarerAuRelais(rs, rang, accesId) {
+  const cfg = G('_relayCfg') ? W._relayCfg() : null
+  const base = String((rs && rs.relayUrl) || (cfg && cfg.base) || '').replace(/\/$/, '')
+  if (!base || !rs || !rs.ownerToken) throw new Error('relais')
+  const r = await fetch(base + '/api/sessions/' + rs.sessionId + '/acces', { method: 'POST', headers: { 'X-Owner-Token': rs.ownerToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ idx: rang, acces_id: accesId }) })
+  if (!r.ok) throw new Error('relais ' + r.status)
+}
+async function preparerUnLocataire(ref, bail, rs, s, rang, dejaPris) {
+  const log = logDe(String(ref).split('@@')[0])
+  const bid = bailId(ref, bail), debut = jour(bail.debut) || null
+  const locs = locatairesDuBail(bail, log)
+  // Rang DANS LE BAIL tenu depuis la collecte (bailIdx) : jamais déduit d'un nom (deux colocataires du même nom).
+  const rangBail = Number.isInteger(s.bailIdx) && locs[s.bailIdx] ? s.bailIdx : locs.findIndex((l) => EL.cleNom(l.nom) === EL.cleNom(s.nom))
+  if (rangBail < 0) throw new Error('Colocataire introuvable dans le bail : ' + s.nom)
+  const nom = locs[rangBail].nom
+  let x = accesDuLocataire(accesDe(bid, debut), nom)
+  if (x && dejaPris.has(x.id)) throw new Error('Deux colocataires portent le même nom : les distinguer dans le bail avant l\'envoi en signature.')
+  const st = x ? etat.statuts.get(x.id) : null
+  let jeton = null
+  if (x && x.revoque_le) {
+    // Accès fermé par le propriétaire : on ne le rouvre jamais sans le lui dire.
+    const ok = G('confirm2') ? W.confirm2('L\'accès de ' + nom + ' à l\'espace locataire est fermé.\n\nLe rouvrir pour qu\'il signe depuis son espace ?') : true
+    if (!ok) return { nom, saute: true }
+  }
+  if (!x) {
+    jeton = EL.nouveauJeton()
+    const id = await API().rpc('elc_inviter', { p_bail_id: bid, p_rang: rangBail, p_nom: nom, p_jeton_sha256: await EL.empreinteJeton(jeton) })
+    x = { id }
+  } else if (!(st && st.compte) || x.revoque_le) {
+    jeton = EL.nouveauJeton()
+    await API().rpc('elc_reinviter', { p_acces_id: x.id, p_jeton_sha256: await EL.empreinteJeton(jeton) })
+  }
+  dejaPris.add(x.id)
+  await API().rpc('elc_signature_poser', { p_acces_id: x.id, p_session_id: rs.sessionId, p_rang: rang })
+  await declarerAuRelais(rs, rang, x.id)
+  s = { ...s, nom }
+  const envoye = jeton ? await notifier('invitation_signature', x.id, { jeton }) : await notifier('signature', x.id, {})
+  return { accesId: x.id, nom: s.nom, jeton, envoye, email: emailDe(locationDe(x) || { ref, bail }, s.nom) }
+}
+async function preparerSignature(ref, rs) {
+  const bail = (db() || {}).baux && db().baux[ref]
+  if (!bail || !rs || !(await comptesAllumes())) return []
+  await rafraichir()
+  const out = [], pris = new Set(), signers = rs.signers || []
+  for (let i = 0; i < signers.length; i++) {
+    const s = signers[i]
+    if (!s || s.role !== 'locataire') continue
+    const o = await preparerUnLocataire(ref, bail, rs, s, rangDansSession(s, i), pris)
+    if (!o.saute) out.push(o)
+  }
+  await rafraichir(); majBloc()
+  const nonEnvoye = out.find((o) => !o.envoye)
+  if (nonEnvoye && nonEnvoye.jeton) {
+    const cfg = G('_relayCfg') ? W._relayCfg() : null
+    const lien = cfg ? EL.lienEspace(cfg.base, nonEnvoye.jeton) : null
+    const log = logDe(String(ref).split('@@')[0])
+    if (lien) await partagerInvitation(lien, nonEnvoye.jeton, nonEnvoye.nom, nonEnvoye.email, (log && (log.adr || log.ref)) || ref, null, { emails: false })
+  }
+  if (out.length && !nonEnvoye) toast(out.length > 1 ? 'Les locataires sont invités à signer depuis leur espace.' : 'Le locataire est invité à signer depuis son espace.', 'ok', 5000)
+  else if (out.filter((o) => !o.envoye).length > 1) toast('E-mails indisponibles : renvoyer l\'invitation des autres locataires depuis la fiche (Espace locataire).', 'warn', 8000)
+  return out
+}
+// « Partager le lien » d'un locataire « compte » : rappel (compte actif) ou nouvelle invitation, jamais le lien /s.
+async function relancerSignature(ref, s, repli) {
+  try {
+    const bail = (db() || {}).baux && db().baux[ref]
+    const rs = bail && bail.signatures && bail.signatures.remoteSession
+    if (!bail || !rs) return
+    const r = await etatRelais()
+    if (!r.lu) { toast('Relais injoignable : réessayer dans un instant.', 'err', 5000); return }
+    if (!r.comptes) { if (typeof repli === 'function') repli(); return }   // comptes éteints : le lien /s s'ouvre de nouveau
+    await rafraichir()
+    const i = rs.signers.indexOf(s)
+    const o = await preparerUnLocataire(ref, bail, rs, s, rangDansSession(s, i), new Set())
+    if (o.saute) return
+    await rafraichir(); majBloc()
+    if (o.envoye) { toast(o.jeton ? 'Invitation à signer renvoyée à ' + o.nom + '.' : 'Rappel envoyé à ' + o.nom + ' : le bail l\'attend dans son espace.', 'ok', 5000); return }
+    const cfg = G('_relayCfg') ? W._relayCfg() : null
+    const lien = o.jeton && cfg ? EL.lienEspace(cfg.base, o.jeton) : null
+    const log = logDe(String(ref).split('@@')[0])
+    if (lien) await partagerInvitation(lien, o.jeton, o.nom, o.email, (log && (log.adr || log.ref)) || ref, null, { emails: false })
+    else toast('E-mail indisponible : prévenir ' + o.nom + ' que le bail l\'attend dans son espace locataire.', 'warn', 7000)
+  } catch (e) { toast('Relance impossible : ' + (/même nom|introuvable/.test(e && e.message) ? e.message : 'droit insuffisant ou connexion perdue.'), 'err', 7000) }
+}
+
 export function demarrer() {
   if (!API() || !API().pret()) return
   if (_demarre) { cycle(true); return }
   _demarre = true
   W._elBlocHtml = blocHtml
-  W.EspaceLoc = { creer, renouveler, revoquer, documents, retirer, messages, joindre, repondre: (id) => repondre(id), ouvrirPiece,
+  W.EspaceLoc = { creer, renouveler, revoquer, detail, documents, retirer, messages, joindre, repondre: (id) => repondre(id), ouvrirPiece,
+    comptesAllumes, preparerSignature, relancerSignature,
     disponiblePourIncident, envoyerTexteIncident,
     // Liens actifs rattachés à la ligne cloud ACTUELLE du bail (re-datation / retrait de « signé hors Propryo » → nouvelle ligne).
     // PREMIERS-PAS (étape « Ouvrir l'espace du locataire ») : accès émis dans l'espace PROPRE, révoqués compris

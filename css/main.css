@@ -11151,6 +11151,15 @@ body[data-dash-v4="on"] .v4s-gest2-pill.warn{background:#fef3c7;color:#92400e}
 .el-bloc .el-locrow{border:1px solid var(--bor);border-radius:var(--rl);padding:12px;background:var(--sur2);margin-bottom:10px}
 .el-bloc .el-locrow-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .el-bloc .el-locrow-h b{font-size:15px;color:var(--t1)}
+.el-bloc .el-locrow-tel{display:flex;align-items:center;gap:10px;width:100%;min-height:60px;text-align:left;font:inherit;color:var(--t1);cursor:pointer}
+.el-bloc .el-locrow-tel .el-locrow-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.el-bloc .el-locrow-tel .el-locrow-tx b{font-size:15px;overflow-wrap:anywhere}
+.el-bloc .el-locrow-tel .el-locrow-tx>span{font-size:13px;color:var(--t2);overflow-wrap:anywhere}
+.el-bloc .el-locrow-tel svg{flex:none;color:var(--t3)}
+#ov-el-detail .btn{min-height:44px}
+/* Détail d'un locataire : jusqu'à 3 actions, empilées sur toute la largeur (jamais de débordement, M-7). */
+#ov-el-detail .m-foot{flex-wrap:wrap}
+#ov-el-detail .m-foot .btn{flex:1 1 100%;justify-content:center}
 .el-bloc .logf-bail-actions .btn,.el-bloc .el-locrow-h .btn{min-height:44px}
 .el-bloc .logf-value{overflow-wrap:anywhere;white-space:normal}
 /* Sous-titre « Ancienne location » dans le bloc */

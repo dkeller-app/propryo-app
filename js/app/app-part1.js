@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.772';
+const IMMOTRACK_VERSION = '15.773';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -4520,7 +4520,14 @@ async function _docShareOpen(type, ctx, opts) {
 }
 
 // Ouvre la modale de partage du lien de signature pour le signataire d'index `signerIndex` dans rs.signers.
-function _openBailSignShareModal(ref, signerIndex) {
+function _openBailSignShareModal(ref, signerIndex, forcerLien) {
+  // Locataire qui signe depuis son compte (S2) : pas de lien /s à partager — invitation ou avis depuis l'espace. Comptes
+  // éteints entre-temps (retour arrière) : repli sur le partage classique du lien.
+  const _rsC = DB.baux && DB.baux[ref] && DB.baux[ref].signatures && DB.baux[ref].signatures.remoteSession;
+  const _sgC = _rsC && Array.isArray(_rsC.signers) ? _rsC.signers[signerIndex] : null;
+  if (!forcerLien && _sgC && _sgC.compte && window.EspaceLoc && typeof window.EspaceLoc.relancerSignature === 'function') {
+    window.EspaceLoc.relancerSignature(ref, _sgC, () => _openBailSignShareModal(ref, signerIndex, true)); return;
+  }
   const bail = DB.baux[ref];
   const rs = bail && bail.signatures && bail.signatures.remoteSession;
   if (!rs || !Array.isArray(rs.signers) || !rs.signers[signerIndex]) { showToast('Session de signature introuvable', 'err'); return; }
@@ -4705,7 +4712,10 @@ async function _emitRemoteSignSession(ref) {
   // 6) créer la session relais
   // nom = nom du bail, repris NON modifiable sur la page de signature (vide → saisie libre, comme avant).
   // liensParSignataire : cette app sait partager un lien PAR signataire (SIG-1) — le relais n'en donne qu'à elle.
-  const meta = { bailRef: ref, liensParSignataire: true, signers: signers.map(s => ({ sigId: s.sigId, role: s.role, nom: s.nomBail || '', email: s.email, ordre: s.ordre })) };
+  // GO 21/10 : mobile du bail (second facteur SMS) ; locataires « compte » quand les comptes sont allumés (S2 : ils
+  // signent depuis leur espace, leur lien /s seul ne s'ouvre plus).
+  const _parCompte = !!(window.EspaceLoc && typeof window.EspaceLoc.comptesAllumes === 'function' && await window.EspaceLoc.comptesAllumes());
+  const meta = { bailRef: ref, liensParSignataire: true, signers: signers.map(s => ({ sigId: s.sigId, role: s.role, nom: s.nomBail || '', email: s.email, tel: s.tel || '', compte: _parCompte && s.role === 'locataire', ordre: s.ordre })) };
   const { sessionId, signUrl, ownerToken, liens } = await _bsRelayCreateSession(pdfBlob, meta);
   // SIG-1 (décision Didier 17/10) : chaque signataire reçoit SON lien, associé par `ordre` (jamais par position).
   const _lienDe = (ordre) => { const l = Array.isArray(liens) ? liens.find(x => x && x.ordre === ordre) : null; return l && typeof l.url === 'string' ? l.url : null; };
@@ -4720,13 +4730,20 @@ async function _emitRemoteSignSession(ref) {
     sessionId, signUrl, ownerToken,
     relayUrl: _emitRelayBase.replace(/\/$/, ''),
     status: 'sent', createdAt: new Date().toISOString(),
-    signers: signers.map(s => ({ sigId: s.sigId, role: s.role, nom: s.nom, email: s.email, distant: s.distant, ordre: s.ordre, signUrl: _lienDe(s.ordre), signedAt: null, notifiedAt: null })),
+    signers: signers.map(s => ({ sigId: s.sigId, role: s.role, nom: s.nom, email: s.email, distant: s.distant, ordre: s.ordre, bailIdx: s.bailIdx, signUrl: _lienDe(s.ordre), signedAt: null, notifiedAt: null })),
     lastPolledAt: null,
     clauseIrlV: _bailClauseVersionNorm(staging && staging.clauseIrlV)   // IRL-REVISION N4/N11 (+ contrat type 2026) : la version IMPRIMÉE dans le PDF envoyé
   };
   bail._modifiedAt = new Date().toISOString();
   saveDB();
-  // 8) Partage du lien au signataire #1 via la modale multi-canal (suivants : relance manuelle).
+  // 7bis) Signature depuis le compte (S3) : chaque locataire « compte » reçoit UN e-mail (invitation + bail à signer, ou
+  // avis si son compte est actif) ; la session est rattachée à son accès. Jamais bloquant pour le reste de l'envoi.
+  if (_parCompte) {
+    try { bail.signatures.remoteSession.signers.forEach(s => { if (s.role === 'locataire') s.compte = true; }); await window.EspaceLoc.preparerSignature(ref, bail.signatures.remoteSession); saveDB(); }
+    catch (e) { console.warn('[signature compte]', e); showToast((/même nom|introuvable/.test(e && e.message) ? e.message + ' ' : '') + 'Bail envoyé en signature, mais l\'invitation à l\'espace locataire n\'est pas partie : la renvoyer avec « Partager le lien » sur la fiche.', 'warn', 9000); }
+  }
+  // 8) Partage du lien au signataire #1 via la modale multi-canal (suivants : relance manuelle). Locataire « compte » :
+  // rien à partager, l'e-mail est parti (la modale le dit).
   _openBailSignShareModal(ref, 0);
   delete window.__remoteBailStaging[ref];
   showToast('📨 Bail envoyé en signature', 'ok', 4000);
@@ -4949,6 +4966,14 @@ async function _buildBailCertificatePdf(bail, proof, contentHash, completedAt, o
       else if (p.otpDelivery === 'ecran-test') line('   code affiché à l\'écran (mode test) et saisi le ' + _dt(p.otpVerifiedAt) + ' : adresse e-mail NON vérifiée', 9);
       else line('   code saisi le ' + _dt(p.otpVerifiedAt) + ' (mode de remise du code non enregistré)', 9);
     }
+    // Second facteur (GO 21/10) : ce qui s'est RÉELLEMENT passé, comme pour le code e-mail.
+    // « sms » n'est écrit par le relais que pour un code réellement envoyé par SMS ; « sms-test » = code affiché à l'écran.
+    if ((p.secondFacteur === 'sms' || p.secondFacteur === 'sms-test') && p.smsVerifiedAt) {
+      if (p.secondFacteur === 'sms' && p.smsDelivery === 'sms') line('   second code reçu par SMS au ' + (p.smsTel || 'mobile du bail') + ' et saisi le ' + _dt(p.smsVerifiedAt), 9);
+      else line('   second code affiché à l\'écran (mode test) et saisi le ' + _dt(p.smsVerifiedAt) + ' : mobile NON vérifié', 9);
+    } else if (p.secondFacteur === 'sms-indisponible') line('   second facteur : service SMS indisponible' + (p.smsIndisponibleAt ? ' le ' + _dt(p.smsIndisponibleAt) : '') + ', signature avec le code e-mail seul', 9);
+    else if (p.secondFacteur === 'sans-mobile') line('   second facteur : aucun mobile valable au bail, signature avec le code e-mail seul', 9);
+    if (p.compte && typeof p.compte === 'object') line('   signé depuis l\'espace locataire, connecté au compte ' + (p.compte.email || '') + (Array.isArray(p.compte.connexion) && p.compte.connexion.length ? ' (connexion : ' + p.compte.connexion.join(', ') + ')' : ''), 9);
     line('   signé le : ' + _dt(p.signedAt) + (p.ip ? ' — IP ' + p.ip : ''), 9);
     if (p.luApprouve) line('   mention « Lu et approuvé » : oui', 9);
     if (p.consentElectronic) line('   consentement à la signature électronique : oui', 9);
@@ -5121,7 +5146,14 @@ async function _completeRemoteSignCore(ref, state) {
       luApprouve: pr.luApprouve == null ? null : pr.luApprouve,
       ip: pr.ip || null,
       userAgent: pr.userAgent || null,
-      pdfSha256: pr.pdfSha256 || null
+      pdfSha256: pr.pdfSha256 || null,
+      // Second facteur SMS et connexion au compte locataire (relais seul, GO 21/10).
+      secondFacteur: pr.secondFacteur || null,
+      smsVerifiedAt: pr.smsVerifiedAt || null,
+      smsDelivery: pr.smsDelivery || null,
+      smsIndisponibleAt: pr.smsIndisponibleAt || null,
+      smsTel: pr.smsTel || null,
+      compte: pr.compte || null
     };
   });
   // BAIL MIXTE — les signataires EN PRÉSENCE (in-app, ex. bailleur) ont signé AVANT l'envoi distant et
@@ -5435,6 +5467,18 @@ async function _bsdDdtUpload(key, input) {
 // même squelette (.bsd-signer-row / ord / avatar / rôle / email), les contrôles spécifiques au rôle
 // (toggle présentiel locataire · case signataire + toggle distance bailleur) sont passés en `controls`,
 // la note éventuelle en `extra`. avBg = couleur ord+avatar (bailleur violet), emailHidden masque l'email.
+// SECOND FACTEUR SMS (GO 21/10) : mobile d'un signataire À DISTANCE, avec l'avertissement « renseigner le mobile »
+// (jamais bloquant : sans mobile, la signature se fait avec le code e-mail seul, et la preuve le note).
+function _bsdTelHtml(side, i, tel, visible) {
+  const ok = !!(window.ImmoTelephone && window.ImmoTelephone.mobileE164(tel));
+  return `<div id="bsd-telw-${side}-${i}"${visible ? '' : ' style="display:none"'}>`
+    + `<input class="inp" id="bsd-tel-${side}-${i}" type="tel" inputmode="tel" value="${escHtml(tel || '')}" placeholder="mobile (second code, par SMS)" oninput="_bsdTelMaj('${side}',${i})" style="margin-top:6px">`
+    + `<div id="bsd-telnote-${side}-${i}" class="hint" style="font-size:12px;color:var(--t2);margin-top:4px${ok ? ';display:none' : ''}">${_uiIcon('alert', 12)} Renseigner le mobile pour un second facteur (code SMS). Sans mobile, la signature reste possible avec le code e-mail seul.</div></div>`;
+}
+function _bsdTelMaj(side, i) {
+  const el = document.getElementById('bsd-tel-' + side + '-' + i), note = document.getElementById('bsd-telnote-' + side + '-' + i);
+  if (el && note) note.style.display = (window.ImmoTelephone && window.ImmoTelephone.mobileE164(el.value)) ? 'none' : '';
+}
 function _bsdSignerRow(o) {
   const bg = o.avBg ? ' style="background:' + o.avBg + '"' : '';
   return `
@@ -5486,6 +5530,8 @@ function _bsdSetMode(side, i, mode) {
   });
   const email = document.getElementById((side === 'b' ? 'bsd-bemail-' : 'bsd-email-') + i);
   if (email) { email.style.display = (mode === 'dist') ? '' : 'none'; if (mode !== 'dist') email.classList.remove('err'); }
+  const telw = document.getElementById('bsd-telw-' + side + '-' + i);
+  if (telw) telw.style.display = (mode === 'dist') ? '' : 'none';
   if (side === 'b') {   // co-gérant : note « signe dans l'app » + grisage de la ligne si « ne signe pas »
     const note = document.getElementById('bsd-bnote-' + i);
     if (note) note.style.display = (mode === 'pres') ? '' : 'none';
@@ -5526,7 +5572,7 @@ function _bailBailleurSigners(bail) {
     // Auto-répare un état 'no' résiduel (ex. co-gérant retiré de l'entité après un envoi à 2 gérants) :
     // le seul signataire restant repasse en présentiel plutôt que de rester bloqué au lancement.
     const mode = (stMode === 'no' && resolved.length <= 1) ? 'pres' : stMode;
-    return { idx: i, id: s.id, kind: s.kind, nom: s.nom, mode, email: (st.email || '').trim() };
+    return { idx: i, id: s.id, kind: s.kind, nom: s.nom, mode, email: (st.email || '').trim(), tel: (st.tel || '').trim() };
   });
 }
 
@@ -5539,7 +5585,7 @@ function _collectSide(out, items, prefix, role, distantFn, labelFn) {
   (items || []).forEach((it, i) => {
     if (!distantFn(it)) return;
     // nomBail : le nom RÉEL du bail (jamais le libellé de repli « Locataire 1 ») — le relais l'impose au signataire.
-    out.push({ sigId: prefix + '-' + rank, role: role, nom: (it && it.nom) || labelFn(i, rank), nomBail: (it && it.nom) ? String(it.nom).trim() : '', email: ((it && it.email) || '').trim(), distant: true, ordre: out.length + 1 });
+    out.push({ sigId: prefix + '-' + rank, role: role, nom: (it && it.nom) || labelFn(i, rank), nomBail: (it && it.nom) ? String(it.nom).trim() : '', email: ((it && it.email) || '').trim(), tel: ((it && it.tel) || '').trim(), distant: true, ordre: out.length + 1, bailIdx: i });
     rank++;
   });
 }
@@ -5932,7 +5978,7 @@ async function openRemoteSignModal(ref) {
     const dist = b.mode === 'dist';
     const controls = _bsdModeSeg('b', i, b.mode, bSigners.length > 1);   // 🟢 Présentiel · 🟣 À distance · ⊘ Ne signe pas (option cachée si un seul gérant — Q1)
     const extra = `<div id="bsd-bnote-${i}" style="font-size:11px;margin-top:2px;color:var(--grn)${signe && !dist ? '' : ';display:none'}">${_uiIcon('check', 13)} Signe dans l'app — pas d'envoi</div>`;
-    return _bsdSignerRow({ rowId: `bsd-brow-${i}`, ordTxt: signe ? (i + 1) : '—', avBg: 'var(--pur,#7c3aed)', role: 'Bailleur', nom: b.nom, controls, emailId: `bsd-bemail-${i}`, emailVal: b.email, emailHidden: !(signe && dist), placeholder: 'email du gérant (signature à distance)', extra, off: !signe });
+    return _bsdSignerRow({ rowId: `bsd-brow-${i}`, ordTxt: signe ? (i + 1) : '—', avBg: 'var(--pur,#7c3aed)', role: 'Bailleur', nom: b.nom, controls, emailId: `bsd-bemail-${i}`, emailVal: b.email, emailHidden: !(signe && dist), placeholder: 'email du gérant (signature à distance)', extra: (extra || '') + _bsdTelHtml('b', i, b.tel || '', signe && dist), off: !signe });
   }).join('');
   const bSection = bSigners.length
     ? bRows
@@ -5943,7 +5989,7 @@ async function openRemoteSignModal(ref) {
     const email = (l && l.email) || '';
     const presentiel = !!(l && l.presentiel);
     const controls = _bsdModeSeg('l', i, presentiel ? 'pres' : 'dist', false);   // 🟢 Présentiel · 🟣 À distance
-    return _bsdSignerRow({ rowId: `bsd-row-${i}`, ordTxt: i + 1, role: 'Locataire', nom, controls, emailId: `bsd-email-${i}`, emailVal: email, emailHidden: presentiel });
+    return _bsdSignerRow({ rowId: `bsd-row-${i}`, ordTxt: i + 1, role: 'Locataire', nom, controls, emailId: `bsd-email-${i}`, emailVal: email, emailHidden: presentiel, extra: _bsdTelHtml('l', i, (bail.locataires && bail.locataires[i] && bail.locataires[i].tel) || '', !presentiel) });
   }).join('');
 
   const html = `
@@ -6052,7 +6098,9 @@ function _confirmBailSignatureFlow(ref) {
         showToast('Email invalide pour ' + (bSigners[i].nom || ('Co-gérant ' + (i + 1))) + ' — à corriger, ou passer ce signataire en présentiel', 'err', 5000);
         if (emailEl) { emailEl.classList.add('err'); emailEl.focus(); } return;
       }
-      signers.push({ id: bSigners[i].id, role: 'bailleur', nom: bSigners[i].nom || ('Co-gérant ' + (i + 1)), mode, email });   /* S1 : id du résolveur PARTAGÉ */
+      const telEl = document.getElementById('bsd-tel-b-' + i);
+      const tel = telEl ? telEl.value.trim() : (bSigners[i].tel || '');
+      signers.push({ id: bSigners[i].id, role: 'bailleur', nom: bSigners[i].nom || ('Co-gérant ' + (i + 1)), mode, email, tel });   /* S1 : id du résolveur PARTAGÉ */
     }
   }
 
@@ -6067,7 +6115,9 @@ function _confirmBailSignatureFlow(ref) {
       showToast('Email invalide pour ' + ((locs[i] && locs[i].nom) || ('Locataire ' + (i + 1))) + ' — à corriger, ou passer ce signataire en présentiel', 'err', 5000);
       if (emailEl) { emailEl.classList.add('err'); emailEl.focus(); } return;
     }
-    signers.push({ id: 'loc-' + i, role: 'locataire', nom: (locs[i] && locs[i].nom) || ('Locataire ' + (i + 1)), mode, email });
+    const telEl = document.getElementById('bsd-tel-l-' + i);
+    const tel = telEl ? telEl.value.trim() : ((locs[i] && locs[i].tel) || '');
+    signers.push({ id: 'loc-' + i, role: 'locataire', nom: (locs[i] && locs[i].nom) || ('Locataire ' + (i + 1)), mode, email, tel });
   }
 
   // Plan (présentiels ordonnés bailleur→locataire + distants).
@@ -6120,10 +6170,10 @@ function _confirmBailSignatureFlow(ref) {
   // Persiste les modes co-gérants (buildBailStructure/D2a) + le présentiel/email locataires (relais).
   if (bSigners.length) {
     bail.bailleurSign = signers.filter(s => s.role === 'bailleur')
-      .map(s => s.mode === 'no' ? { mode: 'no' } : (s.mode === 'dist' ? { mode: 'dist', email: s.email } : { mode: 'pres' }));
+      .map(s => s.mode === 'no' ? { mode: 'no' } : (s.mode === 'dist' ? { mode: 'dist', email: s.email, tel: s.tel || '' } : { mode: 'pres' }));
   }
   signers.filter(s => s.role === 'locataire').forEach((s, i) => {
-    if (bail.locataires[i]) { bail.locataires[i].presentiel = (s.mode === 'pres'); if (s.mode === 'dist' && s.email) bail.locataires[i].email = s.email; }
+    if (bail.locataires[i]) { bail.locataires[i].presentiel = (s.mode === 'pres'); if (s.mode === 'dist' && s.email) bail.locataires[i].email = s.email; if (s.mode === 'dist' && s.tel) bail.locataires[i].tel = s.tel; }
   });
   bail._modifiedAt = new Date().toISOString();
   saveDB();   // audit : saveBail() est le handler du FORMULAIRE d'édition (lit #b-ref) — ici on persiste la DB directement

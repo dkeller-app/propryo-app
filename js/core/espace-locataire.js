@@ -152,6 +152,39 @@ export function etatAccord(a, fdh) {
   return { donne: false, texte: 'Accord non donné : remettre la quittance papier sur demande' }
 }
 
+// ─────────────────────────── Compte du locataire (migration 0065) : état vu du propriétaire ───────────────────────────
+/**
+ * État du compte d'un accès, pour le bloc « Espace locataire » (maquette ESPACE-LOCATAIRE-COMPTE, écrans 9 à 11).
+ * x = ligne locataire_acces ; st = ligne de elc_statuts ({ compte, lie_le, invitation_le, invitation_expire_le,
+ * lien_ancien }) ou undefined ; jour = AAAA-MM-JJ ; maintenant = ms (expiration de l'invitation) ; fd / fdh = formats.
+ * → { cle, libelle, badge, sous, actions[] } ; cle ∈ actif | invite | expire | ancien | sans | ferme | fini.
+ * actions ∈ 'fermer' | 'reinviter' | 'rouvrir' (Messages reste toujours proposé par l'appelant).
+ */
+export function statutCompte(x, st, jour, maintenant = Date.now(), fd = (v) => String(v || ''), fdh = fd) {
+  const a = x || {}, s = st || {}
+  const ph = phaseAcces(a.fin_bail, a.comptes_clos_le, jour)
+  if (ph === 'fini') return { cle: 'fini', libelle: 'Fermé', badge: 'b-mute', sous: 'Période de consultation terminée', actions: [] }
+  if (a.revoque_le) return { cle: 'ferme', libelle: 'Fermé', badge: 'b-mute', sous: 'Accès fermé le ' + fd(a.revoque_le), actions: ['rouvrir'] }
+  if (s.compte) return { cle: 'actif', libelle: 'Actif', badge: 'b-ok', sous: a.derniere_visite ? 'Vu le ' + fdh(a.derniere_visite) : 'Compte créé le ' + fd(s.lie_le), actions: ['fermer'] }
+  if (s.invitation_le) {
+    const exp = Date.parse(s.invitation_expire_le || '')
+    if (!(exp > maintenant)) return { cle: 'expire', libelle: 'Invitation expirée', badge: 'b-warn', sous: 'Envoyée le ' + fd(s.invitation_le) + ' : la renvoyer', actions: ['reinviter', 'fermer'] }
+    return { cle: 'invite', libelle: 'Invité', badge: 'b-warn', sous: 'Invitation envoyée le ' + fd(s.invitation_le), actions: ['reinviter', 'fermer'] }
+  }
+  if (s.lien_ancien) return { cle: 'ancien', libelle: 'Lien sans compte', badge: 'b-mute', sous: a.derniere_visite ? 'Dernière visite le ' + fdh(a.derniere_visite) : 'Jamais ouvert', actions: ['reinviter', 'fermer'] }
+  return { cle: 'sans', libelle: 'Sans accès', badge: 'b-mute', sous: 'Aucune invitation en cours', actions: ['reinviter', 'fermer'] }
+}
+/** Pastille du bloc : « 1 actif · 1 invité » (accès fermés et terminés non comptés). */
+export function resumeComptes(statuts) {
+  const n = { actif: 0, invite: 0, autre: 0 }
+  for (const s of statuts || []) { if (s.cle === 'actif') n.actif++; else if (s.cle === 'invite') n.invite++; else if (s.cle !== 'ferme' && s.cle !== 'fini') n.autre++ }
+  const p = []
+  if (n.actif) p.push(n.actif + ' actif' + (n.actif > 1 ? 's' : ''))
+  if (n.invite) p.push(n.invite + ' invité' + (n.invite > 1 ? 's' : ''))
+  if (n.autre) p.push(n.autre + ' à inviter')
+  return p.join(' · ')
+}
+
 // ─────────────────────────── Signalement → incident du registre (D11) ───────────────────────────
 export const PIECES = Object.freeze([
   { k: 'cuisine', lbl: 'Cuisine' }, { k: 'salle_de_bain', lbl: 'Salle de bain' }, { k: 'wc', lbl: 'WC' },
@@ -404,7 +437,9 @@ export const MIME_DE = Object.freeze({ jpg: 'image/jpeg', png: 'image/png', pdf:
  * personnel déjà reçu. data : { bailleur, lien?, titre?, statut? }.
  * La quittance « disponible » ne part par e-mail que si l'accord électronique est donné (appelant).
  */
-export const TYPES_EMAIL = Object.freeze(['invitation', 'document', 'message', 'signalement'])
+// 'invitation_compte' (migration 0065) : invitation à créer le compte du locataire (lien à usage unique), comptes allumés.
+// 'invitation_signature' / 'signature' (0067) : bail à signer depuis le compte (invitation incluse, ou avis si compte actif).
+export const TYPES_EMAIL = Object.freeze(['invitation', 'invitation_compte', 'invitation_signature', 'signature', 'document', 'message', 'signalement'])
 export function modeleEmail(type, data) {
   const d = data || {}
   const lien = String(d.lien || '')

@@ -1995,16 +1995,18 @@ async function onLoggedIn(api, overlay, user) {
     }
     renderProof(overlay, api, user, esp, db)
   } catch (e) {
-    renderProof(overlay, api, user, esp || {}, null, e.message)
+    // Compte LOCATAIRE seul (migration 0065) : la base refuse de lui créer un espace propriétaire — message clair.
+    renderProof(overlay, api, user, esp || {}, null, /el:compte-locataire/.test(String(e && e.message)) ? MSG_COMPTE_LOCATAIRE : e.message)
   }
 }
+const MSG_COMPTE_LOCATAIRE = 'Ce compte est un compte locataire : il ouvre l’espace locataire (lien reçu du propriétaire, puis connexion par code), pas l’application du propriétaire.'
 
 // ── UI ───────────────────────────────────────────────────────────────────────
 function renderProof(overlay, api, user, esp, db, err) {
   overlay.classList.add('imv-auth-open')
   const left = overlay.querySelector('#imsb-left')
   if (err) {
-    left.innerHTML = `${brand()}<div class="imsb-mid"><div class="imsb-err">⚠ Hydratation : ${escapeHtml(err)}</div>
+    left.innerHTML = `${brand()}<div class="imsb-mid"><div class="imsb-err">${err === MSG_COMPTE_LOCATAIRE ? escapeHtml(err) : '⚠ Hydratation : ' + escapeHtml(err)}</div>
       <button class="imsb-btn imsb-ghost" id="imsb-logout">Se déconnecter</button></div>`
   } else {
     const rows = COUNTS.map(([k, lbl]) => `<tr><td>${escapeHtml(lbl)}</td><td class="imsb-num">${sizeOf(db[k])}</td></tr>`).join('')
