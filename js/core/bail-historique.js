@@ -160,6 +160,19 @@ export function construireHistoriqueBail(input) {
     }
   }
 
+  const _tot = (hc, ch) => (Number(hc) || 0) + (Number(ch) || 0);
+  // Tarif en vigueur à une date parmi les périodes VIVANTES du même lot / chapitre (reprise d'une suppression).
+  const _tarifA = (dateIso, bd) => {
+    const d = _ymd(dateIso);
+    let hit = null;
+    for (const q of (i.bareme || [])) {
+      if (!q || q._deleted || _nr(q.ref) !== want || !q.debut) continue;
+      if (_ymd(q.bailDebut) && bd && _ymd(q.bailDebut) !== bd) continue;
+      if (_ymd(q.debut) > d || (q.fin != null && _ymd(q.fin) < d)) continue;
+      if (!hit || _ymd(q.debut) > _ymd(hit.debut)) hit = q;
+    }
+    return hit ? { hc: Number(hit.hc) || 0, ch: Number(hit.ch) || 0, total: _tot(hit.hc, hit.ch) } : null;
+  };
   // ── Périodes du barème (+ événements 'modif' pour les périodes source:'manuel').
   for (const p of (i.bareme || [])) {
     if (!p || _nr(p.ref) !== want) continue;
@@ -183,21 +196,55 @@ export function construireHistoriqueBail(input) {
           type: 'periode-annulee', date: dd, avant: total,
           dateEffet: _ymd(p._annuleeParCloture), motif: p.note || ''
         }, dd);
+      } else if (p._modifieePar) {
+        // BAIL-PERIODES (v15.775) — une période modifiée (date / loyer / charges) : UNE carte « avant → après », au jour
+        // où la période commence désormais. La trace vit dans le barème (même blob que la période) : si la
+        // modification survit à une fusion entre appareils, sa carte aussi.
+        const m = p._modifieePar;
+        const nd = _ymd(m.debut) || dd;
+        _pushEv(cd.rail, {
+          type: 'periode-modifiee', date: nd, le: _ymd(m.le),
+          avant: { debut: dd, hc: Number(p.hc) || 0, ch: Number(p.ch) || 0, total },
+          apres: { debut: nd, hc: Number(m.hc) || 0, ch: Number(m.ch) || 0, total: _tot(m.hc, m.ch) },
+          motif: m.motif || '', auteur: m.auteur || ''
+        }, nd);
+      } else if (p._supprimeePar) {
+        const m = p._supprimeePar;
+        _pushEv(cd.rail, {
+          type: 'periode-supprimee', date: dd, le: _ymd(m.le),
+          avant: { debut: dd, fin: p.fin == null ? null : _ymd(p.fin), hc: Number(p.hc) || 0, ch: Number(p.ch) || 0, total },
+          reprise: m.reprise || '', repriseTarif: _tarifA(dd, _ymd(p.bailDebut) || cd.bailDebut),
+          motif: m.motif || '', auteur: m.auteur || ''
+        }, dd);
+      } else if (p._absorbeePar) {
+        const m = p._absorbeePar;
+        _pushEv(cd.rail, { type: 'periode-absorbee', date: dd, le: _ymd(m.le), avant: total, dateEffet: _ymd(m.debut) }, dd);
       }
       continue;
     }
     const c = _byBailDebut(p.bailDebut) || _byRange(p.debut) || chapitres[0];
     const debut = _ymd(p.debut);
     const fin = p.fin != null ? _ymd(p.fin) : null;
+    const bdP = _ymd(p.bailDebut) || c.bailDebut;
+    const premiere = !!(bdP && debut === bdP);
+    const irl = p.source === 'irl';
     const periode = {
       debut, fin, hc: Number(p.hc) || 0, ch: Number(p.ch) || 0,
       total: (Number(p.hc) || 0) + (Number(p.ch) || 0),
       source: p.source || '', note: p.note || '',
       future: !!(today && debut > today),
-      courante: !!(today && debut <= today && (fin == null || today <= fin))
+      courante: !!(today && debut <= today && (fin == null || today <= fin)),
+      // BAIL-PERIODES — de quoi modifier la période sans rien deviner côté écran : `cle` = {ref, bailDebut, debut}
+      // (jamais l'index du tableau), `premiere` = elle commence à la date du bail (sa date EST celle du bail),
+      // `droits` = ce que la fenêtre laisse saisir (révision IRL : charges seulement, décision D2 du 22/10).
+      cle: { ref: p.ref, bailDebut: bdP, debut },
+      premiere, chapitre: c.bailDebut, chapitreStatut: c.statut,
+      droits: { date: !premiere && !irl, hc: !irl, ch: true, supprimer: !irl }
     };
     c.rail.push({ kind: 'periode', periode, dateTri: debut });
-    if (p.source === 'manuel') {
+    // Une période NÉE manuelle a sa carte « Modification du loyer ». Une période réécrite par une édition (`_edition.de`
+    // posé) a déjà sa carte « Période modifiée » (tombstone) : pas de seconde carte pour la même décision.
+    if (p.source === 'manuel' && (!p._edition || p._edition.de == null)) {
       _pushEv(c.rail, {
         type: 'modif', date: debut, effet: debut,
         hc: periode.hc, ch: periode.ch, note: p.note || ''

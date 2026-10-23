@@ -123,6 +123,8 @@ import {
 } from './core/loyer-bareme.js';
 // HISTORIQUE-BAIL-ONGLET (17/07) - chapitres/rail de l'historique du bail (onglet Bail inline)
 import { construireHistoriqueBail, enVigueur as bailHistoEnVigueur } from './core/bail-historique.js';
+// BAIL-PERIODES (v15.775) — modifier / supprimer / ajouter UNE période du barème (pur) ; l'orchestrateur est dans app-part2.js.
+import * as BaremeEdition from './core/bareme-edition.js';
 import * as BailSignatureEtatMod from './core/bail-signature-etat.js';
 import { bailSigneComplet, diffModificationsBail, reappliquerJournalBaux, journalDuBail, modificationsDuBail, valeurLisible as bailModifValeur } from './core/bail-modifications.js';
 // HISTORIQUE-BAIL-ONGLET - popup de validation des modifications financieres du bail
@@ -639,6 +641,7 @@ window._premierDuMois = _premierDuMois;
 window._premierDuMoisSuivant = _premierDuMoisSuivant;
 window.reconstruireBaremeLot = reconstruireBaremeLot;   // étape 3 — migration de l'existant
 window._bailHistoConstruire = construireHistoriqueBail;   // HISTORIQUE-BAIL-ONGLET
+window.BaremeEdition = BaremeEdition;   // BAIL-PERIODES : cleDePeriode / trouverPeriode / modifierPeriode / supprimerPeriode / ajouterPeriode / impactEdition / syntheseImpact / irlProgrammeeDuLot
 // Modifications d'un bail signé hors avenant (journal DB.baux_evenements, migration 0054)
 // BAIL-EN-COURS-SIGNE-HORS-PROPRYO : source unique js/core/bail-signature-etat.js ; le miroir IIFE (js/helpers/bail-signature-etat.global.js) pose déjà window.BailSignatureEtat avant les app-part.
 window.BailSignatureEtat = Object.assign({}, window.BailSignatureEtat || {}, BailSignatureEtatMod);

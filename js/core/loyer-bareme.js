@@ -289,7 +289,7 @@ export function appliquerNouvellePeriode(periods, nouvelle) {
   //
   // CEINTURE, PAS MESSAGE : un `return` nu est un échec muet, et le silence est pire qu'un
   // refus. Ce chemin doit rester INATTEIGNABLE depuis l'écran, et il l'est par construction :
-  // le seul écrivain dont la date est libre (_histoSaveCorrPeriode) résout son chapitre par
+  // le seul écrivain dont la date est libre (« Ajouter une période », BaremeEdition.ajouterPeriode) résout son chapitre par
   // `chapitrePour` — qui rend le chapitre de la période qu'on corrige ou celui du bail qui
   // occupe la date, jamais un chapitre postérieur à elle — puis refuse À VOIX HAUTE si la date
   // précède le bail. Les deux autres (popup de modification, révision IRL) partent d'une date

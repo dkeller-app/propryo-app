@@ -291,7 +291,7 @@ export function analyserSuppressionRevision(input) {
   // corrigée à la main, validée hors connexion) : remettre l'ancien loyer sur le lot sans toucher au dû
   // ferait diverger l'affichage et le dû — refus explicite, comme « Corriger la date d'effet ».
   if (nature === 'appliquee' && reprise === effet && bareme && !perIrl) {
-    return { ok: false, erreur: 'Période du barème introuvable pour cette révision — utiliser « Corriger une période ».' };
+    return { ok: false, erreur: 'Période du barème introuvable pour cette révision — utiliser « Ajouter une période ».' };
   }
   return { ok: true, nature, entree: h, effet, reprise, moisQuittancesConserves: quittance, jumelle: null };
 }

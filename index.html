@@ -10,7 +10,7 @@
      ⚠️ tout nouvel endpoint réseau DOIT être ajouté ici. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://xcbtashflclswyiyvfgn.supabase.co; connect-src 'self' https://xcbtashflclswyiyvfgn.supabase.co wss://xcbtashflclswyiyvfgn.supabase.co https://bail-sign-relay.didierkeller.workers.dev https://api.insee.fr https://recherche-entreprises.api.gouv.fr https://api-adresse.data.gouv.fr https://errial.georisques.gouv.fr https://www.georisques.gouv.fr https://data.ademe.fr https://gmail.googleapis.com https://www.googleapis.com; frame-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Propryo v15.774</title>
+<title>Propryo v15.775</title>
 <!-- F9.2 (audit sécu) anti-clickjacking : GitHub Pages ne pose pas X-Frame-Options et frame-ancestors
      est ignoré en <meta> → garde JS. Si l'app est chargée dans une iframe (tentative de clickjacking
      sur l'UI authentifiée), on la remet en top-level ; si window.top est cross-origin (accès refusé),
@@ -124,7 +124,7 @@ window.ensurePdfLibs=(function(){var p=null;return function(){
 <link rel="preload" href="css/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="css/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!-- LOT 1 : les 5 familles Google Fonts et leurs 2 preconnect sont retirés — Inter et Schibsted Grotesk sont vendorisées dans css/fonts/, déclarées en @font-face en tête de css/main.css. Règle projet : aucun CDN au runtime. -->
-<link rel="stylesheet" href="css/main.css?v=15.774">
+<link rel="stylesheet" href="css/main.css?v=15.775">
 <link rel="stylesheet" id="imsb-style-link" href="css/login.css?v=cf8123a4">
 <!-- modulepreload:begin (genere par tools/stamp-app-parts.mjs - ne pas editer a la main) -->
 <link rel="modulepreload" href="js/vendor/supabase-js-2.110.2.esm.js">
@@ -167,6 +167,7 @@ window.ensurePdfLibs=(function(){var p=null;return function(){
 <link rel="modulepreload" href="js/core/pilotage-familles.js">
 <link rel="modulepreload" href="js/core/loyer-bareme.js">
 <link rel="modulepreload" href="js/core/bail-historique.js">
+<link rel="modulepreload" href="js/core/bareme-edition.js">
 <link rel="modulepreload" href="js/core/bail-signature-etat.js">
 <link rel="modulepreload" href="js/core/bail-modifications.js">
 <link rel="modulepreload" href="js/core/bail-modif.js">
@@ -387,7 +388,7 @@ var b=document.getElementById('imsb-submit');if(b){b.disabled=false;b.textConten
     <span class="sb-logo-icon"><!-- Logo validé (charte) : carré contour + point corail, toujours corail --><svg viewBox="0 0 32 32" width="24" height="24" fill="none" aria-hidden="true"><rect x="1.76" y="1.76" width="28.48" height="28.48" rx="7.68" fill="none" stroke="#ff5a3c" stroke-width="3.52"/><circle cx="21.34" cy="21.34" r="4.1" fill="#ff5a3c"/></svg></span>
     <div class="sb-logo-text">
       <strong>Propryo</strong>
-      <em>v15.774</em>
+      <em>v15.775</em>
     </div>
     <!-- v15.26 : boutons utilitaires en haut sidebar.
          v15.38 : bouton font-size supprimé sur demande user (cf footer V4 dashboard). -->
@@ -4750,8 +4751,8 @@ tr.cand-row-new td{background:linear-gradient(90deg,rgba(59,126,246,.06),transpa
 <!-- BASCULE SUPABASE (P3) — config publique (clé anon ; RLS protège) + entrée sous interrupteur.
      INERTE par défaut sur l'app de tous les jours ; ne s'active QUE via un opt-in explicite. -->
 <script src="js/app/supabase-config.js?v=63ebc26f" defer></script>
-<script src="js/app/app-part1.js?v=4486ae0d" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part1')"></script>
-<script src="js/app/app-part2.js?v=c9863ff3" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part2')"></script>
+<script src="js/app/app-part1.js?v=1a4dfa58" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part1')"></script>
+<script src="js/app/app-part2.js?v=516a372f" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part2')"></script>
 <script src="js/app/app-part3.js?v=58cfb975" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part3')"></script>
 
 <!-- ── v15.12 Sprint 12 GESTION DG : modale restitution DG ── -->
@@ -5307,7 +5308,7 @@ tr.cand-row-new td{background:linear-gradient(90deg,rgba(59,126,246,.06),transpa
 
 <!-- ═══ AUDIT-SUIVI-LOYERS étape 3 → HISTORIQUE-BAIL-ONGLET (17/07) : la timeline vit
      INLINE dans l'onglet Bail (accordéons .hbc par bail) — l'overlay ov-histo-loyer a été
-     supprimé, la modale ov-histo-corr est conservée. Styles .hl-* partagés. ═══ -->
+     supprimé ; la fenêtre de période est ov-bper (BAIL-PERIODES v15.775). Styles .hl-* partagés. ═══ -->
 <style>
 .hl-nowband{display:flex;align-items:center;gap:20px;background:var(--sur);border:1px solid var(--bor);
   border-radius:var(--rl);padding:14px 20px;margin-bottom:18px;flex-wrap:wrap}
@@ -5364,6 +5365,53 @@ tr.cand-row-new td{background:linear-gradient(90deg,rgba(59,126,246,.06),transpa
 @media(max-width:767px){.hl-nextchip{white-space:normal}}
 .hl-lnk{font-size:12px;color:var(--acc);font-weight:700;cursor:pointer}
 .hl-lnk.hl-lnk-neg{color:var(--neg)}
+/* ── BAIL-PERIODES (v15.775) : « Modifier » au bout de chaque période + fenêtre « Période du … ». Tokens seulement,
+ *    pas de rouge (M-15 : corail = action ou importance), téléphone = page plein écran (M-16), 44 px / 16 px. ── */
+button.hl-lnk{background:none;border:0;padding:0;font-family:inherit;display:inline-flex;align-items:center;gap:4px}
+.hl-per-src{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--t3)}
+.bper-modal{max-width:500px;width:96%}
+.bper-modal .m-body{display:block}
+.bper-sub{font-size:12px;color:var(--t3);margin-bottom:12px}
+.bper-f{margin-bottom:12px}
+.bper-lab{display:block;font-size:12px;font-weight:700;color:var(--t2);margin-bottom:5px}
+.bper-f .inp{width:100%}
+.bper-f .inp[disabled]{opacity:.7;cursor:not-allowed}
+.bper-g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bper-g2 .bper-f{margin-bottom:12px}
+.bper-aide{font-size:12px;color:var(--t3);margin-top:4px;line-height:1.45}
+.bper-q{font-size:14px;line-height:1.5;margin:0 0 12px;color:var(--t1)}
+.bper-irl{background:var(--grn-bg);border-radius:var(--r);padding:9px 12px;font-size:12.5px;line-height:1.5;color:var(--t1);margin-bottom:12px}
+.bper-irl-gestes{display:flex;gap:14px;flex-wrap:wrap;margin-top:5px}
+.bper-enc-wrap{margin:4px 0 12px}
+.bper-enc{background:var(--warn-soft);border-left:3px solid var(--warn);border-radius:var(--r);padding:10px 12px;font-size:13px;line-height:1.5;color:var(--t1)}
+.bper-enc.info{background:var(--sur2);border-left-color:var(--bor);color:var(--t2)}
+.bper-l1{display:flex;gap:6px;align-items:flex-start}
+.bper-l1 .uic{color:var(--warn);flex-shrink:0;margin-top:2px}
+.bper-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.bper-chip{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--sur);border:1px solid var(--bor);color:var(--t2);line-height:1.4}
+.bper-chip.fort{border-color:var(--acc);color:var(--t1)}
+.bper-det{margin-top:8px}
+.bper-tbl{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;margin-top:6px}
+.bper-tbl th{text-align:left;color:var(--t3);font-weight:700;padding:3px 4px;border-bottom:1px solid var(--bor)}
+.bper-tbl td{padding:3px 4px;border-bottom:1px solid var(--bor);color:var(--t2)}
+.bper-tbl .r{text-align:right}
+.bper-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bper-grow{flex:1}
+.bper-suppr-tel{display:none}
+@media(max-width:767px){
+  .hl-per-mod{min-height:44px}
+  #ov-bper{padding:0;align-items:stretch}
+  #ov-bper .bper-modal{width:100% !important;max-width:none !important;height:100% !important;max-height:none !important;margin:0 !important;border:0 !important;border-radius:0 !important;display:flex;flex-direction:column}
+  #ov-bper .bper-modal .m-body{flex:1 1 auto;overflow-y:auto;min-height:0}
+  .bper-g2{grid-template-columns:1fr 1fr}
+  #ov-bper .inp{font-size:16px;min-height:44px}
+  .bper-suppr-pc{display:none !important}
+  .bper-suppr-tel{display:block;margin-top:18px;border-top:1px solid var(--bor);padding-top:14px}
+  .bper-suppr-tel .btn{width:100%;justify-content:center;min-height:44px}
+  .bper-foot .bper-grow{display:none}
+  .bper-foot .btn{flex:1;justify-content:center;min-height:48px}
+  .bper-irl-gestes .hl-lnk,.bper-det .hl-lnk,.bper-aide .hl-lnk{min-height:44px}
+}
 /* Téléphone : les gestes d'une carte d'historique restent des cibles de 44 px (charte M-x). */
 @media(max-width:767px){.hl-foot .hl-lnk{display:inline-flex;align-items:center;gap:4px;min-height:44px}}
 /* ── accordéons « un bail = un chapitre » (HISTORIQUE-BAIL-ONGLET) ── */
@@ -5479,27 +5527,16 @@ tr.cand-row-new td{background:linear-gradient(90deg,rgba(59,126,246,.06),transpa
   </div>
 </div>
 
-<div class="ov hidden" id="ov-histo-corr" onclick="closeBg(event,'ov-histo-corr')">
-  <div class="modal" style="max-width:480px;width:96%">
+<!-- BAIL-PERIODES (v15.775, D1-D4 GO 22/10) — « Période du … » / « Ajouter une période » / « Supprimer la période ».
+     Rempli par _bperRendre (app-part2.js). Téléphone : page plein écran (M-16), pied collant ; PC / tablette : fenêtre. -->
+<div class="ov hidden" id="ov-bper" onclick="if(event.target===this)_bperFermer()">
+  <div class="modal bper-modal" role="dialog" aria-modal="true" aria-labelledby="bper-titre">
     <div class="m-head">
-      <h3>Corriger une période de loyer</h3>
-      <button class="m-close" onclick="closeM('ov-histo-corr')">✕</button>
+      <h3 id="bper-titre">Période</h3>
+      <button class="m-close" onclick="_bperFermer()" aria-label="Fermer" title="Fermer">✕</button>
     </div>
-    <div class="m-body">
-      <div style="font-size:12px;color:var(--t3);margin-bottom:12px" id="histo-corr-sub"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><label class="mu sm">Début (inclus)</label><input type="date" class="inp" id="hc-debut" style="width:100%"></div>
-        <div><label class="mu sm">Fin (vide = en cours)</label><input type="date" class="inp" id="hc-fin" style="width:100%"></div>
-        <div><label class="mu sm">Loyer hors charges (€)</label><input type="number" step="0.01" class="inp" id="hc-hc" style="width:100%"></div>
-        <div><label class="mu sm">Provision charges (€)</label><input type="number" step="0.01" class="inp" id="hc-ch" style="width:100%"></div>
-        <div style="grid-column:1/-1"><label class="mu sm">Motif (obligatoire)</label><textarea class="inp" id="hc-motif" rows="2" style="width:100%" placeholder="Ex. : erreur de saisie à la signature…"></textarea></div>
-      </div>
-      <div style="grid-column:1/-1;font-size:11.5px;color:var(--t2);background:var(--warn-soft,rgba(178,122,18,.13));border-radius:var(--r);padding:9px 12px;margin-top:12px">⚠️ Les mois déjà quittancés ne sont pas recalculés : la quittance émise fait foi.</div>
-    </div>
-    <div class="m-foot">
-      <button class="btn bs" onclick="closeM('ov-histo-corr')">Annuler</button>
-      <button class="btn bp" onclick="_histoSaveCorrPeriode()">Enregistrer</button>
-    </div>
+    <div class="m-body" id="bper-body"></div>
+    <div class="m-foot bper-foot" id="bper-foot"></div>
   </div>
 </div>
 

@@ -134,7 +134,7 @@ export function redaterRevisionIRL(input) {
   // M2 (audit 17/07) : sans période barème correspondante (révision legacy pré-Q1), re-dater
   // l'historique seul ferait diverger l'affichage du dû réel → refus explicite.
   if (pIdx < 0) {
-    return { ok: false, erreur: 'Période du barème introuvable pour cette révision — utiliser « Corriger une période ».' };
+    return { ok: false, erreur: 'Période du barème introuvable pour cette révision — utiliser « Ajouter une période ».' };
   }
 
   // Bornes : strictement après le debut de la période précédente, avant la suivante.

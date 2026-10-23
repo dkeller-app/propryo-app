@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.774';
+const IMMOTRACK_VERSION = '15.775';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -9661,7 +9661,9 @@ function _duMoisLot(ref, ym) {
 function _loyerEtatLot(ref, opts) {
   opts = opts || {};
   if (typeof window === 'undefined' || typeof window.etatDepuisSuivi !== 'function' || typeof _finSuiviLot !== 'function') return null;
-  const s = _finSuiviLot(ref, { sansTolerance: !opts.graceLast });
+  // BAIL-PERIODES (v15.775) — `opts.bareme` : le MÊME moteur lancé sur un barème proposé (fenêtre « Période du … » :
+  // ce que la modification ferait, AVANT de l'enregistrer). Jamais mémoïsé, rien n'est écrit.
+  const s = _finSuiviLot(ref, { sansTolerance: !opts.graceLast, bareme: opts.bareme || null });
   if (!s) return null;
   let debuts = null;
   if (opts.bailDebut) debuts = [String(opts.bailDebut).slice(0, 10)];
@@ -24922,18 +24924,22 @@ function _irlEnvelopeBtn(log, st) {
 // `applyIRL`/`_irlValidConfirm` (D18), `genIRLLetter`/`previewIRLLetter` (la lettre suit
 // le clic), `skipIRL`, `resetIRLApply`, la table INSEE (`rIRLParams`).
 
-function _dernierMoisQuittanceYm(ref) {
+// Les mois ('YYYY-MM', triés, sans doublon) qui ont une quittance VIVANTE au registre pour ce lot (ref tolérante).
+function _quittancesYmDuLot(ref) {
   const want = String(ref == null ? '' : ref).trim().toLowerCase();
-  let max = null;
+  const out = new Set();
   for (const q of (DB.quittances || [])) {
     if (!q || q._deleted) continue;
     if (String(q.logement == null ? '' : q.logement).trim().toLowerCase() !== want) continue;
     const d = (typeof _qaMoisToDate === 'function') ? _qaMoisToDate(q.mois) : null;
     if (!d || isNaN(d.getTime())) continue;
-    const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    if (!max || ym > max) max = ym;
+    out.add(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
   }
-  return max;
+  return [...out].sort();
+}
+function _dernierMoisQuittanceYm(ref) {
+  const l = _quittancesYmDuLot(ref);
+  return l.length ? l[l.length - 1] : null;
 }
 
 // Date du jour en ISO LOCAL (pas UTC : décale curMo un 1er du mois entre minuit et ~2 h).
@@ -24960,7 +24966,7 @@ function _baremeRecordRevision(log, ref, newHC, dateEffetIso, opts) {
   // Le résolveur du barème est celui de duMois() — aucun moteur concurrent.
   // La chaîne des sources est une FONCTION PURE testée (js/core/loyer-du-mois.js) : période EN
   // VIGUEUR au barème → bail → lot → 0. Le barème passe en tête (audit) parce que la correction
-  // manuelle d'une période (_histoSaveCorrPeriode) n'écrit QUE dans le barème : reprendre bail.ch
+  // manuelle d'une période (« Modifier / Ajouter une période ») n'écrit QUE dans le barème : reprendre bail.ch
   // ici annulerait silencieusement la correction à la révision suivante.
   const _bailDebutRef = (DB.baux[ref] && DB.baux[ref].debut) || (log && log.debut) || null;
   const ch = (typeof window !== 'undefined' && typeof window._loyerProvisionPourRevision === 'function')

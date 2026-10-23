@@ -14,7 +14,7 @@
 // Si oubli de bump : le SW continuera à servir l'ancienne version cache. Mais grâce
 // au network-first sur les JS, les nouveaux JS seront quand même fetched dès qu'online.
 
-const CACHE_VER = 'immotrack-v15.774';
+const CACHE_VER = 'immotrack-v15.775';
 
 // ── Install : skipWaiting immédiat + pré-cache offline fallback ──────────────
 self.addEventListener('install', e => {

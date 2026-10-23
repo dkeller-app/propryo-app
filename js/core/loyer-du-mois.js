@@ -83,7 +83,7 @@ export function periodeEnVigueurA(bareme, ref, iso) {
  * Provision de charges à inscrire sur la période d'une RÉVISION de loyer (IRL ou batch), quand
  * la révision ne porte que le loyer HC. Chaîne des sources, dans cet ordre :
  *   1. la période EN VIGUEUR au barème à la date d'effet — c'est la provision réellement due,
- *      et la seule que met à jour une correction manuelle datée (_histoSaveCorrPeriode n'écrit
+ *      et la seule que met à jour une correction manuelle datée (« Modifier / Ajouter une période » n'écrit
  *      QUE dans le barème : reprendre bail.ch ici annulerait silencieusement la correction) ;
  *   2. le bail, puis le lot, pour un barème lacunaire (lot non migré) ;
  *   3. 0 en dernier recours seulement — personne ne sait, et c'est dit.
@@ -106,7 +106,7 @@ export function provisionPourRevision(bareme, ref, dateEffetIso, bailCh, logCh, 
 /**
  * O6 (audit avant bêta, lot D) — LE LOYER À RÉVISER : le loyer HC EN VIGUEUR la veille de la date d'effet d'une
  * révision (IRL, cycle éteint), lu au barème — la seule source qu'une correction manuelle datée met à jour
- * (`_histoSaveCorrPeriode` n'écrit QUE dans le barème). Avant : `log.hc`, qui ignorait la correction et l'écrasait à
+ * (« Modifier / Ajouter une période » n'écrit QUE dans le barème). Avant : `log.hc`, qui ignorait la correction et l'écrasait à
  * la révision suivante. Même borne que `provisionPourRevision` : une période d'un AUTRE bail (barème mal refermé)
  * n'est pas retenue. Repli : le loyer du lot (`logHc`), comme avant, pour un barème vide ou un montant non saisi.
  * @returns {number}
