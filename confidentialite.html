@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="index,follow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'none'; base-uri 'self'; form-action 'none'">
+<title>Politique de confidentialité — Propryo</title>
+<link rel="icon" href="brand-assets/propryo-mark.svg" type="image/svg+xml">
+<style>
+/* Page publique autonome : jetons RÉELS de l'app (css/main.css, thèmes sobre / dark), polices auto-hébergées, aucun script. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:400 800;font-display:swap;src:url(css/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Inter';font-style:normal;font-weight:400 800;font-display:swap;src:url(css/fonts/inter-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Schibsted Grotesk';font-style:normal;font-weight:400 900;font-display:swap;src:url(css/fonts/schibsted-grotesk-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{
+  --bg:#f4f5f8;--sur:#ffffff;--sur2:#f7f8fb;--sur3:#eef1f6;--bor:#e4e7ee;--bor2:#eef0f5;
+  --t1:#101521;--t2:#3c4658;--t3:#5f6f86;
+  --acc:#ff5a3c;--acc-ink:#c2410c;--acc-soft:#ffe7e0;--cta-text:#101521;
+  --pos:#16795e;--pos-soft:rgba(22,121,94,.10);--warn:#8f620e;--warn-soft:rgba(143,98,14,.10);
+  --shadow-card:0 1px 3px rgba(16,21,33,.05);
+  --r:8px;--rl:14px;--rp:999px;
+  --font:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --display:'Schibsted Grotesk','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161d;--sur:#1e222c;--sur2:#262b37;--sur3:#2e3442;--bor:rgba(255,255,255,.12);--bor2:rgba(255,255,255,.08);
+    --t1:#f2f5fa;--t2:#cdd6e3;--t3:#929cbb;
+    --acc:#ff6a4a;--acc-ink:#ff8163;--acc-soft:rgba(255,106,74,.18);--cta-text:#14161d;
+    --pos:#3fd6a3;--pos-soft:rgba(63,214,163,.12);--warn:#f1bd55;--warn-soft:rgba(241,189,85,.12);
+    --shadow-card:0 0 0 1px rgba(255,255,255,.06);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--t2);font:16px/1.6 var(--font)}
+a{color:var(--acc-ink);text-underline-offset:2px}
+a:focus-visible,summary:focus-visible{outline:3px solid var(--acc);outline-offset:2px;border-radius:4px}
+.wrap{max-width:820px;margin:0 auto;padding:0 16px}
+header.top{background:var(--sur);border-bottom:1px solid var(--bor)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px}
+.logo img{display:block;height:30px;width:auto}
+.logo .dk{display:none}
+@media (prefers-color-scheme: dark){.logo .lt{display:none}.logo .dk{display:block}}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border:1px solid var(--bor);border-radius:var(--r);background:var(--sur);color:var(--t1);font-weight:600;font-size:14px;text-decoration:none}
+.back svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+h1,h2,h3{font-family:var(--display);color:var(--t1);letter-spacing:-.02em;line-height:1.2}
+h1{font-size:30px;font-weight:800;margin:28px 0 6px}
+h2{font-size:21px;font-weight:800;margin:0 0 12px}
+h3{font-size:16px;font-weight:700;margin:16px 0 6px}
+.maj{color:var(--t3);font-size:14px;margin:0 0 20px}
+.chapo{font-size:16px;margin:0 0 16px}
+.avocat{display:flex;gap:10px;align-items:flex-start;background:var(--warn-soft);border:1px solid var(--warn);border-radius:var(--rl);padding:12px 14px;margin:0 0 24px;font-size:14.5px;color:var(--t1);line-height:1.5}
+.avocat svg{flex:none;width:20px;height:20px;stroke:var(--warn);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+.resume{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px;margin:0 0 24px;padding:0;list-style:none}
+.resume li{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:14px;box-shadow:var(--shadow-card);font-size:14.5px;line-height:1.45}
+.resume b{display:block;color:var(--t1);font-size:15px;margin-bottom:2px}
+nav.toc{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:12px 16px;margin:0 0 24px}
+nav.toc p{margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)}
+nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:28px;font-size:14.5px}
+nav.toc li{padding:3px 0;break-inside:avoid}
+@media (max-width:600px){nav.toc ol{columns:1}}
+section{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:20px;margin:0 0 14px;box-shadow:var(--shadow-card);scroll-margin-top:12px}
+section p{margin:0 0 10px}
+section ul{margin:0 0 10px;padding-left:20px}
+section li{margin:3px 0}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:600px){.roles{grid-template-columns:1fr}}
+.role{border:1px solid var(--bor);border-radius:var(--r);padding:12px;background:var(--sur2)}
+.role b{color:var(--t1)}
+.role small{display:block;color:var(--t3);font-size:13px;margin-top:4px}
+details{border:1px solid var(--bor);border-radius:var(--r);background:var(--sur2);margin:0 0 8px}
+summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 14px;font-weight:700;color:var(--t1);font-size:15px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";flex:none;width:9px;height:9px;border-right:2px solid var(--t3);border-bottom:2px solid var(--t3);transform:rotate(45deg);margin-top:-4px;transition:transform .15s}
+details[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+dl{margin:0;padding:0 14px 12px}
+dt{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-top:10px}
+dd{margin:2px 0 0;font-size:15px}
+.tbl{width:100%;border-collapse:collapse;font-size:14.5px}
+.tbl th,.tbl td{text-align:left;vertical-align:top;padding:10px 8px;border-bottom:1px solid var(--bor2)}
+.tbl th{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t3)}
+.tbl td b{color:var(--t1)}
+@media (max-width:600px){
+  .tbl thead{display:none}
+  .tbl,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
+  .tbl tr{border:1px solid var(--bor);border-radius:var(--r);background:var(--sur2);padding:6px 10px;margin:0 0 8px}
+  .tbl td{border:0;padding:4px 0}
+  .tbl td[data-l]::before{content:attr(data-l);display:block;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t3)}
+}
+.pill{display:inline-block;padding:1px 9px;border-radius:var(--rp);font-size:12.5px;font-weight:700;background:var(--pos-soft);color:var(--pos);white-space:nowrap}
+.pill.us{background:var(--warn-soft);color:var(--warn)}
+.note{background:var(--sur2);border-left:3px solid var(--acc);border-radius:0 var(--r) var(--r) 0;padding:10px 12px;font-size:14.5px;margin:10px 0}
+footer{padding:20px 0 36px;color:var(--t3);font-size:13.5px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:6px 16px}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="logo" href="./" aria-label="Propryo — retour à l'application">
+    <img class="lt" src="brand-assets/propryo-logo-light.svg" alt="Propryo" width="111" height="30">
+    <img class="dk" src="brand-assets/propryo-logo-dark.svg" alt="Propryo" width="111" height="30">
+  </a>
+  <a class="back" href="./"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Retour à l'application</a>
+</div></header>
+
+<main class="wrap">
+  <h1>Politique de confidentialité</h1>
+  <p class="maj">Mise à jour le 23 octobre 2026 · Information prévue aux articles 13 et 14 du règlement (UE) 2016/679 (RGPD).</p>
+  <p class="chapo">Propryo est une application de gestion locative. Cette page décrit les données personnelles traitées, pourquoi, combien de temps, par qui, et comment exercer ses droits.</p>
+
+  <p class="avocat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg><span><b>Modèle à faire relire par un avocat</b> avant la mise en service. Certaines qualifications juridiques (bases légales, analyse d'impact) restent à confirmer et sont signalées comme telles.</span></p>
+
+  <ul class="resume" aria-label="L'essentiel">
+    <li><b>Données hébergées dans l'Union européenne</b>Base et fichiers chez Supabase, en Irlande.</li>
+    <li><b>Aucun traceur, aucun cookie</b>Pas de publicité, pas de mesure d'audience, pas de revente.</li>
+    <li><b>IA en Europe, rien de conservé</b>Mistral AI : rétention zéro, aucun entraînement sur les données.</li>
+    <li><b>Candidats : 30 jours après un refus</b>Puis effacement réel. Aucune note, aucune décision automatique.</li>
+  </ul>
+
+  <nav class="toc" aria-label="Sommaire">
+    <p>Sommaire</p>
+    <ol>
+      <li><a href="#qui">Qui est responsable</a></li>
+      <li><a href="#donnees">Données, finalités, durées</a></li>
+      <li><a href="#candidats">Candidats</a></li>
+      <li><a href="#locataires">Locataires</a></li>
+      <li><a href="#ia">Intelligence artificielle</a></li>
+      <li><a href="#prestataires">Prestataires et pays</a></li>
+      <li><a href="#stockage">Cookies et stockage sur l'appareil</a></li>
+      <li><a href="#securite">Sécurité</a></li>
+      <li><a href="#droits">Droits et contact</a></li>
+    </ol>
+  </nav>
+
+  <section id="qui">
+    <h2>1. Qui est responsable</h2>
+    <div class="roles">
+      <!-- Adresse personnelle de l'éditeur. À remplacer par le siège de la société quand elle existera. -->
+      <div class="role"><b>Le compte Propryo</b><br>Responsable du traitement : <b>Didier Keller</b>, entrepreneur individuel, éditeur de Propryo.<br>Adresse : 22 boulevard Leblois, 67000 Strasbourg.
+        <small>Concerne : identifiants de connexion, réglages du compte, suivi de la mise en route pendant la bêta.</small></div>
+      <div class="role"><b>Les données saisies par un bailleur</b><br>Responsable du traitement : <b>le bailleur</b> (particulier ou société) qui gère le logement. Propryo traite ces données pour son compte, en sous-traitant (art. 28 RGPD).
+        <small>Concerne : locataires, garants, candidats, artisans, documents du bail.</small></div>
+    </div>
+    <p style="margin-top:12px">Aucun délégué à la protection des données n'est désigné : sa désignation n'est pas obligatoire à ce stade (art. 37 RGPD). Pour toute question sur vos données, voir le § 9.</p>
+  </section>
+
+  <section id="donnees">
+    <h2>2. Données, finalités, bases légales, durées</h2>
+    <details open>
+      <summary>Compte et connexion</summary>
+      <dl>
+        <dt>Finalité</dt><dd>Créer le compte, se connecter, accéder aux données de ses sociétés et de ses biens, partager l'accès avec des associés.</dd>
+        <dt>Données</dt><dd>Adresse e-mail, mot de passe (géré par le service d'authentification de Supabase), réglages du compte, rattachement aux sociétés.</dd>
+        <dt>Base légale</dt><dd>Exécution du service (art. 6.1.b).</dd>
+        <dt>Durée</dt><dd>Les données sont conservées tant que le compte est actif. Un compte de locataire (accès à l'espace locataire par code e-mail) est effacé 30 jours après la fermeture de son dernier accès, sauf autre bail en cours, après deux e-mails d'alerte (à la fermeture, puis sept jours avant l'effacement).</dd>
+      </dl>
+    </details>
+    <details>
+      <summary>Mise en route pendant la bêta</summary>
+      <dl>
+        <dt>Finalité</dt><dd>Mesurer la prise en main pendant la bêta privée et améliorer le parcours d'accueil. Propryo est responsable de ce traitement.</dd>
+        <dt>Données</dt><dd>Date à laquelle chaque étape de mise en route a été faite (logement, bail, relevé bancaire, règle d'import, espace du locataire, plafond, artisan, associé), état de la visite guidée. Aucun clic, aucune page vue, aucune adresse IP, aucune donnée de locataire ou de candidat.</dd>
+        <dt>Base légale</dt><dd>Intérêt légitime (art. 6.1.f). Opposition possible à tout moment : case « Partager la progression de mise en route avec Propryo » dans Paramètres › Mon profil ; décochée, les dates déjà enregistrées sont effacées.</dd>
+        <dt>Durée</dt><dd>Durée du compte ; effacement 12 mois après la fin de la bêta.</dd>
+      </dl>
+    </details>
+    <details>
+      <summary>Bailleurs et sociétés</summary>
+      <dl>
+        <dt>Finalité</dt><dd>Gestion du patrimoine, déclarations fiscales (2044, 2072), comptabilité.</dd>
+        <dt>Données</dt><dd>Identité des bailleurs et des gérants, SIREN, forme juridique, IBAN de versement des loyers.</dd>
+        <dt>Durée</dt><dd>Durée d'activité, puis 10 ans (art. L123-22 du Code de commerce).</dd>
+      </dl>
+    </details>
+    <details>
+      <summary>Signature du bail à distance</summary>
+      <dl>
+        <dt>Finalité</dt><dd>Recueillir la signature électronique du bail et constituer le dossier de preuve.</dd>
+        <dt>Données</dt><dd>Bail au format PDF ; empreinte de l'adresse e-mail du signataire, téléphone ; preuves : empreinte du PDF signé, adresse IP, navigateur, horodatages. Un code à 6 chiffres est envoyé par e-mail avant la signature.</dd>
+        <dt>Base légale</dt><dd>Exécution du contrat (art. 6.1.b) ; intérêt légitime à la valeur probante (art. 6.1.f).</dd>
+        <dt>Durée</dt><dd>Relais de signature : 14 jours au plus. Bail signé et preuves : avec le dossier du bail.</dd>
+      </dl>
+    </details>
+    <details>
+      <summary>Incidents et artisans</summary>
+      <dl>
+        <dt>Finalité</dt><dd>Faire réparer le logement : signalement du locataire, intervention d'un artisan par lien sans compte, devis, facture, et établir qui paie selon la loi.</dd>
+        <dt>Données transmises à l'artisan</dt><dd>Adresse et accès du logement, prénom et nom du locataire, son téléphone seulement s'il l'a accepté, description et photos du problème, plafond d'intervention. Jamais le bail, le loyer, ni « qui paie ».</dd>
+        <dt>Base légale</dt><dd>Exécution du bail et obligation d'entretien du bailleur (art. 6.1.b ; art. 6 c de la loi n° 89-462) ; consentement du locataire pour son téléphone.</dd>
+        <dt>Durée</dt><dd>Lien de l'artisan : 30 jours après la validation du bailleur, 90 jours au plus, révocable. Données : avec le dossier de l'incident et du bail.</dd>
+      </dl>
+    </details>
+    <details>
+      <summary>Journal d'activité</summary>
+      <dl>
+        <dt>Finalité</dt><dd>Garder la trace des modifications faites dans le compte.</dd>
+        <dt>Données</dt><dd>Auteur, date, action, élément modifié, champs changés.</dd>
+        <dt>Durée</dt><dd>10 000 entrées au plus ; les plus anciennes sont effacées au-delà. Export et purge possibles dans Paramètres.</dd>
+      </dl>
+    </details>
+  </section>
+
+  <section id="candidats">
+    <h2>3. Candidats à une location</h2>
+    <ul>
+      <li><b>Responsable</b> : le propriétaire du logement. Les mentions d'information sont aussi affichées sur la page de dépôt du dossier.</li>
+      <li><b>Pièces demandées</b> : seulement celles de la liste du décret n° 2015-1437 du 5 novembre 2015. Jamais de RIB au stade de la candidature.</li>
+      <li><b>Aucune note, aucun classement, aucune décision automatique</b> (art. 22 RGPD). Le propriétaire peut comparer les dossiers d'un même logement sur des critères objectifs côte à côte (dossier complet, état des pièces, taux d'effort, garantie), sans pondération ni total. La décision reste humaine, dossier par dossier.</li>
+      <li><b>Contrôle des pièces</b> : signature 2D-Doc et informations techniques des fichiers vérifiées sur l'appareil du propriétaire ; existence de l'employeur dans l'annuaire des entreprises de l'État (seul le SIREN est envoyé) ; si le propriétaire le lance, lecture de la première page des bulletins de salaire et du contrat de travail par Mistral AI. Les résultats sont des constats factuels, présentés pièce par pièce. La base légale retenue pour ce contrôle est l'<b>intérêt légitime</b> du propriétaire (prévention de la fraude documentaire) ; cette base et l'analyse d'impact relative à la protection des données (AIPD) correspondante <b>restent à faire valider par un avocat</b>.</li>
+      <li><b>Dépôt en ligne</b> : le dossier transite par le relais de Propryo jusqu'à sa récupération par le propriétaire ; effacé du relais à l'expiration de l'invitation (7, 14 ou 30 jours).</li>
+      <li><b>Dossier non retenu</b> : <b>effacé 30 jours après la date du refus</b> (fiche, pièces, résultats des contrôles, fichiers). Un dossier refusé n'est plus jamais relu ni envoyé à l'IA.</li>
+      <li><b>Dossier retenu</b> : il rejoint le dossier du bail.</li>
+    </ul>
+  </section>
+
+  <section id="locataires">
+    <h2>4. Locataires</h2>
+    <ul>
+      <li><b>Responsable</b> : le bailleur. <b>Finalités</b> : exécution du bail et obligations légales (quittances, révision du loyer, états des lieux, régularisation des charges).</li>
+      <li><b>Données</b> : identité, coordonnées, données du bail (loyer, charges, dépôt de garantie, dates), IBAN seulement en cas de prélèvement, photos d'état des lieux.</li>
+      <li><b>Durée</b> : pendant le bail, puis 3 ans après son terme (art. 2224 du Code civil) ; 6 ans pour un mandataire ou un expert-comptable (art. L102 B du Livre des procédures fiscales).</li>
+      <li><b>Espace locataire</b> : accès par un lien personnel, sans mot de passe (un compte par code e-mail peut être proposé). Seule une empreinte du lien est conservée ; le bailleur peut le couper ou le renouveler à tout moment. Chaque colocataire ne voit que ses propres documents, messages et signalements. Accès pendant le bail, puis jusqu'à la clôture des comptes, puis 6 mois pour consulter les documents ; au plus tard 14 mois après la fin du bail.</li>
+      <li><b>Quittance électronique</b> : envoyée seulement avec l'accord exprès du locataire (case non cochée d'avance, datée, retirable), conformément à l'art. 21 de la loi n° 89-462.</li>
+      <li><b>Photos envoyées depuis l'espace locataire</b> : ré-encodées dans le navigateur, ce qui retire la position GPS.</li>
+    </ul>
+  </section>
+
+  <section id="ia">
+    <h2>5. Intelligence artificielle</h2>
+    <p>Prestataire unique : <b>Mistral AI</b> (France), point d'accès européen. <b>Rétention zéro activée le 16 octobre 2026</b> : le contenu envoyé n'est pas conservé par Mistral AI. <b>Aucun entraînement</b> sur ces données.</p>
+    <ul>
+      <li><b>Dictée de l'état des lieux</b> : la voix est transcrite, puis l'IA propose un état par élément. Rien n'entre dans l'état des lieux sans validation, élément par élément. L'enregistrement n'est pas conservé : effacé dès la transcription, ou après 30 jours au plus s'il n'a pas pu partir.</li>
+      <li><b>Signalement d'un incident</b> : aide à la description pour le locataire, constat de l'artisan, lecture d'une facture ou d'un devis.</li>
+      <li><b>Bulletins de salaire des candidats</b> : lecture de la première page seulement, à la demande du propriétaire.</li>
+    </ul>
+    <p>Chaque proposition est marquée « Proposé par l'IA, à vérifier ». Aucune décision n'est prise par l'IA.</p>
+  </section>
+
+  <section id="prestataires">
+    <h2>6. Prestataires et pays</h2>
+    <table class="tbl">
+      <thead><tr><th>Prestataire</th><th>Rôle</th><th>Lieu</th></tr></thead>
+      <tbody>
+        <tr><td data-l="Prestataire"><b>Supabase</b></td><td data-l="Rôle">Base de données, fichiers (photos, pièces, documents), authentification.</td><td data-l="Lieu"><span class="pill">UE</span> Irlande</td></tr>
+        <tr><td data-l="Prestataire"><b>Mistral AI</b></td><td data-l="Rôle">Transcription et lecture par IA (voir § 5). Rétention zéro, aucun entraînement.</td><td data-l="Lieu"><span class="pill">UE</span> France</td></tr>
+        <tr><td data-l="Prestataire"><b>Cloudflare, Inc.</b></td><td data-l="Rôle">Relais de Propryo : transit du bail à signer (14 jours au plus), des dossiers de candidature (jusqu'à expiration de l'invitation), pages de l'espace locataire et de l'artisan (sans stockage des données).</td><td data-l="Lieu"><span class="pill us">Hors UE possible</span> Réseau mondial ; clauses contractuelles types</td></tr>
+        <tr><td data-l="Prestataire"><b>Resend</b> (Plus Five Five, Inc.)</td><td data-l="Rôle">Envoi des e-mails : code de signature, invitations, avis de nouveau document ou message. Ni pièce jointe ni suivi des ouvertures ou des clics.</td><td data-l="Lieu"><span class="pill us">États-Unis</span> Envoi depuis l'UE ; contenu des e-mails conservé 30 jours aux États-Unis ; clauses contractuelles types ; adhésion au Data Privacy Framework à vérifier</td></tr>
+        <tr><td data-l="Prestataire"><b>GitHub, Inc.</b></td><td data-l="Rôle">Héberge les fichiers publics de l'application ; reçoit l'adresse IP des visiteurs dans ses journaux techniques.</td><td data-l="Lieu"><span class="pill us">États-Unis</span> Clauses contractuelles types</td></tr>
+      </tbody>
+    </table>
+    <h3>Services publics consultés</h3>
+    <p>Pour remplir certaines informations, l'application interroge des services publics. Seul le strict nécessaire leur est envoyé, jamais le nom ni les coordonnées d'une personne :</p>
+    <ul>
+      <li>Base adresse nationale : l'adresse du logement ;</li>
+      <li>Annuaire des entreprises de l'État : un SIREN, ou un code d'activité et une position ;</li>
+      <li>Géorisques : la position du logement ;</li>
+      <li>ADEME : le numéro du diagnostic de performance énergétique, ou un code d'activité et une position (liste RGE).</li>
+    </ul>
+  </section>
+
+  <section id="stockage">
+    <h2>7. Cookies et stockage sur l'appareil</h2>
+    <p><b>Propryo ne dépose aucun cookie</b> et n'utilise aucun outil de mesure d'audience ni de publicité. L'application garde sur l'appareil ce qui est nécessaire à son fonctionnement, ce qui ne demande pas de consentement (art. 82 de la loi Informatique et Libertés) :</p>
+    <table class="tbl">
+      <thead><tr><th>Où</th><th>Quoi</th><th>Combien de temps</th></tr></thead>
+      <tbody>
+        <tr><td data-l="Où"><b>Session du navigateur</b></td><td data-l="Quoi">Jeton de connexion, par défaut.</td><td data-l="Combien de temps">Jusqu'à la fermeture du navigateur.</td></tr>
+        <tr><td data-l="Où"><b>Stockage local</b></td><td data-l="Quoi">Copie locale des données du compte, pour travailler hors ligne ; jeton de connexion si « Rester connecté sur cet appareil » est coché ou si l'application est installée ; préférences d'affichage.</td><td data-l="Combien de temps">Jusqu'à la déconnexion ; la copie locale est effacée à la déconnexion.</td></tr>
+        <tr><td data-l="Où"><b>Base du navigateur</b></td><td data-l="Quoi">Photos d'état des lieux en attente d'envoi, dictées en attente de transcription, sauvegardes.</td><td data-l="Combien de temps">Jusqu'à l'envoi ; dictée : 30 jours au plus.</td></tr>
+        <tr><td data-l="Où"><b>Cache de l'application</b></td><td data-l="Quoi">Fichiers de l'application (aucune donnée personnelle).</td><td data-l="Combien de temps">Jusqu'à la version suivante.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="securite">
+    <h2>8. Sécurité</h2>
+    <ul>
+      <li>Échanges chiffrés (HTTPS) ; données chiffrées au repos chez les hébergeurs.</li>
+      <li>Cloisonnement par société dans la base : un associé ne voit que les sociétés auxquelles il a accès.</li>
+      <li>Liens personnels (espace locataire, artisan, signature) non devinables ; seule leur empreinte est conservée.</li>
+      <li>Clés des prestataires gardées par le relais, jamais dans le navigateur ; journaux techniques sans contenu personnel.</li>
+      <li>En cas de violation de données : notification à la CNIL sous 72 heures et information des personnes en cas de risque élevé (art. 33 et 34 RGPD).</li>
+    </ul>
+  </section>
+
+  <section id="droits">
+    <h2>9. Droits et contact</h2>
+    <p>Toute personne dont les données sont traitées dispose des droits d'accès (art. 15), de rectification (art. 16), d'effacement (art. 17), de limitation (art. 18), de portabilité (art. 20) et d'opposition (art. 21) ; elle peut retirer à tout moment un consentement donné (art. 7).</p>
+    <div class="note"><b>Locataires, garants, candidats, artisans</b> : s'adresser d'abord au bailleur, responsable de ces données. Propryo l'aide à répondre : export et effacement des données d'un locataire depuis l'application.</div>
+    <p><b>Compte Propryo</b> : écrire à <a href="mailto:didier.keller@propryo.fr">didier.keller@propryo.fr</a>. Réponse sous un mois (art. 12).</p>
+    <p>En cas de désaccord, une réclamation peut être adressée à la CNIL (art. 77) : <a href="https://www.cnil.fr/fr/plaintes" rel="noopener">www.cnil.fr/fr/plaintes</a>.</p>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <span>© 2026 Propryo</span>
+  <a href="./">Retour à l'application</a>
+</div></footer>
+</body>
+</html>
