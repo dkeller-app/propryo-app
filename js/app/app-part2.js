@@ -1040,7 +1040,7 @@ function _lyToggleTous() { _lyUI.tousOpen = !_lyUI.tousOpen; if (typeof rLoyers 
 const _LY_FAM = {
   quit:      { ico: 'receipt', t: 'Quittances demandées', hint: 'Mois soldé — la quittance peut être remise' },
   retard:    { ico: 'warn',    t: 'Impayés',              hint: 'Loyer ou charges non réglés — aucun document n\'est émis' },
-  prep:      { ico: 'chart',   t: 'Révisions', hint: 'À préparer ou en retard — dans les deux cas, une lettre à faire' }
+  prep:      { ico: 'chart',   t: 'Révisions', hint: 'À vérifier, à préparer ou en retard — une décision à prendre' }
 };
 
 function rLoyers() {
@@ -1072,7 +1072,7 @@ function rLoyers() {
   const demandes = etats.filter(e => e.demande && e.aQuittancer.length);
   const retards  = etats.filter(e => e.retard.enRetard);
   const rev      = _lyRevisionsTriees(etats);
-  const nbRev    = rev.aPreparer.length + rev.enRetard.length;
+  const nbRev    = rev.aVerifier.length + rev.aPreparer.length + rev.enRetard.length;   // IRL-MOTEUR : une révision à vérifier est un geste à faire
   const loues    = etats.filter(e => e.bail).length;
 
   // ── 1. La ligne de commande : titre, contexte, bouton. Une seule ligne. ──
@@ -1089,7 +1089,8 @@ function rLoyers() {
   //    tuiles (ex-D25) et la bascule « Tous les loyers » (elle doublonnait le Suivi).
   html += _lyBloc('retard', retards.length, retards.map(_lyLigneRetard),
     'Tous les loyers et toutes les charges sont à jour.');
-  const revItems = rev.aPreparer.map(x => _lyLigneRev(x, false))
+  const revItems = rev.aVerifier.map(_lyLigneRevAVerifier)
+    .concat(rev.aPreparer.map(x => _lyLigneRev(x, false)))
     .concat(rev.enRetard.map(x => _lyLigneRev(x, true)))
     .concat(rev.programmees.map(_lyLigneRevProg));
   const nProg = rev.programmees.length;
@@ -1159,7 +1160,7 @@ function _lyBadgeTip(n) {
     const lots = _lyLots(); if (!lots.length) return '';
     const etats = lots.map(_lyEtatLot);
     const b = window.loyersBadgeBreakdown(etats, _lyRevisionsTriees(etats));
-    return `Loyers — ${n} à traiter : ${b.revisions} révision${b.revisions > 1 ? 's' : ''} à préparer · ${b.quittances} quittance${b.quittances > 1 ? 's' : ''} demandée${b.quittances > 1 ? 's' : ''} · ${b.pasAJour} lot${b.pasAJour > 1 ? 's' : ''} pas à jour`;
+    return `Loyers — ${n} à traiter : ${b.revisions} révision${b.revisions > 1 ? 's' : ''} à préparer ou à vérifier · ${b.quittances} quittance${b.quittances > 1 ? 's' : ''} demandée${b.quittances > 1 ? 's' : ''} · ${b.pasAJour} lot${b.pasAJour > 1 ? 's' : ''} pas à jour`;
   } catch (e) { return ''; }
 }
 
@@ -1617,11 +1618,33 @@ function _lyRevisionsTriees(etats) {
     enRetard:  toutes.filter(({ rev }) => rev.etat === 'en-retard'),
     // IRL-REVISION R5 — validées, effet à venir : listées (« programmée au JJ/MM »), pas comptées.
     programmees: toutes.filter(({ rev }) => rev.etat === 'programmee'),
+    // IRL-MOTEUR (v15.776) — effet atteint mais NON appliquées (le loyer a changé depuis la validation) :
+    // en tête du bloc, comptées, avec leurs gestes. Lues dans le journal (motif posé par le moteur).
+    aVerifier: _lyRevisionsAVerifier(etats),
     // D15 — les cycles éteints par le délai d'un an (art. 17-1). V14 : « IRL non appliquées ».
     perdues:   toutes.filter(({ rev }) => rev.perdue),
     // D17 — visibles, hors du compteur, aucun geste demandé pour l'instant (V20/V21 au lot 7).
     muets:     toutes.filter(({ rev }) => rev.muet)
   };
+}
+
+/** IRL-MOTEUR — les révisions « à vérifier » des lots affichés : [{ e, index, av }] (détail recalculé à l'affichage). */
+function _lyRevisionsAVerifier(etats) {
+  const out = [];
+  for (const e of (etats || [])) {
+    try { (_irlAVerifierDuLot(e.ref) || []).forEach(x => { const c = _irlAVerifierCalc(x.index); if (c) out.push({ e, index: x.index, av: c.av }); }); } catch (err) {}
+  }
+  return out;
+}
+
+/** IRL-MOTEUR — la ligne d'une révision à vérifier : le motif en clair, les montants, les gestes (jamais d'office). */
+function _lyLigneRevAVerifier({ e, index, av }) {
+  return { log: e.log, html: _lyRow({
+    ref: e.ref, loc: e.log.locataire, demande: !!e.demande,
+    contexte: `<span class="ly2-p wa">à vérifier</span> <span class="mu ly2-irlvm">${escHtml(_irlAVerifierTexte(av))} À décider.</span>`,
+    montant: `<span class="ly2-p nu">${fmt(av.ancienHC).replace(' €', '')}</span> → <b>${fmt(av.nouveauHC)}</b>`,
+    actions: `<span class="ly2-irlv">${_irlAVerifierBoutons(index)}</span>`
+  }) };
 }
 
 /** Le manque à gagner d'un cycle éteint, calculé sur les indices DE CE CYCLE (jamais ceux
@@ -15129,7 +15152,10 @@ function _histoBailEventHtml(ev, c, refSafe, bailForDg){
   if(t==='irl'){
     const pct = (ev.ancienHC>0) ? ((ev.nouveauHC-ev.ancienHC)/ev.ancienHC*100) : null;
     const move = `<div class="hl-move"><span class="old">${fmt(ev.ancienHC)}</span><span>→</span><span class="new">${fmt(ev.nouveauHC)}</span>${pct!=null?`<span class="pct">${pct>=0?'+':''}${pct.toFixed(2)} %</span>`:''}</div>`;
-    const etat = ev.pendingApply ? '<span class="hl-badge b-warn">' + _uiIcon('hourglass') + ' en attente</span>' : (ev.future ? '<span class="hl-badge b-warn">' + _uiIcon('hourglass') + ' à venir</span>' : '');
+    // IRL-MOTEUR (v15.776) — une révision non appliquée au jour de l'effet le DIT, avec son motif et les gestes.
+    const _avc = (ev.aVerifier && c.statut==='courant' && ev.idx!=null && typeof _irlAVerifierCalc==='function') ? _irlAVerifierCalc(Number(ev.idx)) : null;
+    const etat = _avc ? '<span class="hl-badge b-warn">' + _uiIcon('warn') + ' à vérifier</span>'
+      : (ev.pendingApply ? '<span class="hl-badge b-warn">' + _uiIcon('hourglass') + ' en attente</span>' : (ev.future ? '<span class="hl-badge b-warn">' + _uiIcon('hourglass') + ' à venir</span>' : ''));
     const hb = ev.horsBail ? '<span class="hl-badge b-warn">hors bail ?</span>' : '';
     // Correction d'événement (décision user ⑤) : re-dater une date d'effet erronée — bail COURANT
     // uniquement (un bail clos est figé), garde-fous Q1 + bornes de périodes dans le module.
@@ -15141,7 +15167,8 @@ function _histoBailEventHtml(ev, c, refSafe, bailForDg){
     // RETOURS 15/10 (lot 1, point 2) — « Supprimer cette révision » : bail COURANT, et seulement quand
     // la suppression est possible (pas sous une révision plus récente qui s'appuie sur ce loyer).
     let suppr = '';
-    if (c.statut==='courant' && ev.idx!=null && typeof _histoIrlSupprAnalyse==='function') {
+    // IRL-MOTEUR : une révision à vérifier porte déjà « Abandonner… » (même geste, motif tracé).
+    if (c.statut==='courant' && ev.idx!=null && !_avc && typeof _histoIrlSupprAnalyse==='function') {
       const _an = _histoIrlSupprAnalyse(ev.idx, ev.effet, ev.nouveauHC);
       if (_an && _an.ok) suppr = `<span class="hl-lnk hl-lnk-neg" role="button" tabindex="0" onclick="_histoIrlSupprimer(${Number(ev.idx)},'${_lyQ(ev.effet || '')}',${Number(ev.nouveauHC) || 0})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">${_uiIcon('trash')} Supprimer cette révision</span>`;
     }
@@ -15149,7 +15176,7 @@ function _histoBailEventHtml(ev, c, refSafe, bailForDg){
       ? `<div class="hl-foot">${lettre}<span class="hl-lnk" onclick="_histoIrlCorrOpen('${refSafe}','${_lyQ(ev.date)}','${_lyQ(ev.effet)}')">${_uiIcon('edit')} Corriger la date d'effet</span>${suppr}</div>`
       : `<div class="hl-foot">${lettre}</div>`;
     return `<div class="hl-card" data-dot="d-irl"><div class="tt"><h4>Révision IRL validée</h4><span class="hl-badge b-irl">IRL${ev.irlVigueur?' '+escHtml(String(ev.irlVigueur).replace(/\s.*$/,'')):''}</span>${etat}${hb}</div>
-      <div class="hl-desc">${ev.irlRef?`Indice ${escHtml(ev.irlRef)} → ${escHtml(ev.irlVigueur)}. `:''}Nouveau loyer à compter du <b>${fd(ev.effet)}</b>${ev.dateEffetAjustee?' (date ajustée — jamais rétroactive)':''} — les mois quittancés font foi.</div>${move}${corr}</div>`;
+      <div class="hl-desc">${ev.irlRef?`Indice ${escHtml(ev.irlRef)} → ${escHtml(ev.irlVigueur)}. `:''}Nouveau loyer à compter du <b>${fd(ev.effet)}</b>${ev.dateEffetAjustee?' (date ajustée — jamais rétroactive)':''} — les mois quittancés font foi.</div>${move}${_avc ? `<div class="hl-desc hl-averif"><b>${escHtml(_irlAVerifierTexte(_avc.av))}</b> Le loyer du bail n'a pas été mis à jour : décider ici.</div><div class="hl-foot hl-averif-a">${_irlAVerifierBoutons(Number(ev.idx))}</div>` : ''}${corr}</div>`;
   }
   if(t==='irl-renonce'){
     return `<div class="hl-card" style="opacity:.8" data-dot="d-renon"><div class="tt"><h4>Révision IRL — renoncée</h4><span class="hl-badge b-warn">⊘ renonciation</span></div>
@@ -15412,8 +15439,21 @@ function _histoIrlSupprimer(idx, effet, nouveauHC){
       + `La révision de ce cycle redevient à faire (article 17-1 : un an pour la demander).`;
   }
   if (!confirm2(msg)) return;
+  _histoIrlSupprAppliquer(inp, a);
+}
+// L'ÉCRITURE de « Supprimer cette révision » (après confirmation) — partagée avec l'ABANDON d'une révision
+// « à vérifier » (IRL-MOTEUR, v15.776) : `opts.abandon` → motif obligatoire tracé (inp.motif), loyer repris
+// `opts.repris` (le loyer en vigueur avant l'effet, s'il a été corrigé depuis la validation).
+function _histoIrlSupprAppliquer(inp, a, opts) {
+  const o = opts || {};
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  if (!IR || typeof IR.supprimerRevision !== 'function') { showToast('Module indisponible (rafraîchir la page)', 'err'); return; }
+  const ref = inp.ref;
   const r = IR.supprimerRevision(inp);
   if (!r.ok) { showToast(r.erreur, 'err', 7000); return; }
+  const e = r.entree;
+  const repris = (o.repris != null && Number.isFinite(Number(o.repris))) ? Number(o.repris) : Number(e.ancienHC);
+  const lib = `${fmt(e.ancienHC)} → ${fmt(e.nouveauHC)} au ${fd(r.effet)}`;
   DB.irlHistorique = r.irlHistorique;
   DB.loyerBareme = r.bareme;
   const log = _histoIrlSupprLot(ref);
@@ -15440,21 +15480,34 @@ function _histoIrlSupprimer(idx, effet, nouveauHC){
     }
     delete log.irlLettreEnvoyee; delete log.irlLettreEnvoyeeDate; delete log.irlLettreEnvoyeePour;
   }
+  // IRL-MOTEUR — après un ABANDON, le loyer vivant (lot, bail) = la période du barème en vigueur aujourd'hui pour ce bail :
+  // jamais un loyer de fiche qui contredit le dû (relectures Fable 3 et 5).
+  if (o.abandon && log && r.nature !== 'doublon' && typeof window._loyerPeriodeEnVigueurA === 'function') {
+    const pT = window._loyerPeriodeEnVigueurA(DB.loyerBareme || [], ref, _todayIsoLocal());
+    const duBail = pT && (!bail || !bail.debut || pT.bailDebut == null || String(pT.bailDebut).slice(0, 10) === String(bail.debut).slice(0, 10));
+    if (duBail && Number.isFinite(Number(pT.hc)) && Number(pT.hc) !== Number(log.hc)) {
+      log.hc = Number(pT.hc);
+      if (bail) bail.hc = Number(pT.hc);
+      if (typeof _pushLoyerTheoFromLive === 'function') _pushLoyerTheoFromLive(log);
+    }
+  }
   if (log) _stamp(log);
   if (bail) _stamp(bail);
   if (!DB.bailEvents) DB.bailEvents = [];
   DB.bailEvents.push(_stamp({ ref, bailDebut: (bail && bail.debut) || '',
     date: _todayIsoLocal(), type: 'correction',
-    motif: r.nature === 'doublon' ? 'Doublon de révision IRL supprimé' : 'Révision IRL supprimée',
-    avant: r.nature === 'doublon' ? null : Number(e.nouveauHC), apres: r.nature === 'doublon' ? null : Number(e.ancienHC),
+    motif: o.abandon ? `Révision IRL abandonnée : ${String(inp.motif || '').trim()}`
+      : (r.nature === 'doublon' ? 'Doublon de révision IRL supprimé' : 'Révision IRL supprimée'),
+    avant: r.nature === 'doublon' ? null : Number(e.nouveauHC), apres: r.nature === 'doublon' ? null : repris,
     dateEffet: r.nature === 'doublon' ? a.effet : r.reprise,
-    detail: `Révision IRL ${lib} supprimée${r.nature === 'appliquee' && r.moisQuittancesConserves ? ' — mois quittancés inchangés' : ''}` }));
-  if (typeof _auditLog === 'function') _auditLog('irl-supprimee', 'bail', ref, `${ref} · ${lib} (${r.nature})`);
+    detail: `Révision IRL ${lib} ${o.abandon ? 'abandonnée (non appliquée)' : 'supprimée'}${r.nature === 'appliquee' && r.moisQuittancesConserves ? ' — mois quittancés inchangés' : ''}` }));
+  if (typeof _auditLog === 'function') _auditLog(o.abandon ? 'irl-abandonnee' : 'irl-supprimee', 'bail', ref, `${ref} · ${lib} (${r.nature})${o.abandon ? ' : ' + String(inp.motif || '').trim() : ''}`);
   saveDB(); refreshAllIRL(); _rPeriodPage();
   try { if (typeof rLogFiche === 'function' && currentPage === 'log-fiche') rLogFiche(); } catch (err) {}
+  const quoi = o.abandon ? 'Révision abandonnée' : 'Révision supprimée';
   showToast(r.nature === 'doublon' ? 'Doublon supprimé — loyer inchangé'
-    : (r.nature === 'programmee' && !r.moisQuittancesConserves ? `Révision supprimée — loyer maintenu à ${fmt(e.ancienHC)}`
-      : `Révision supprimée — loyer de ${fmt(e.ancienHC)} à partir du ${fd(r.reprise)}`
+    : (r.nature === 'programmee' && !r.moisQuittancesConserves ? `${quoi} — loyer maintenu à ${fmt(repris)}`
+      : `${quoi} — loyer de ${fmt(repris)} à partir du ${fd(r.reprise)}`
         + (r.moisQuittancesConserves ? ` ; les mois déjà quittancés restent à ${fmt(e.nouveauHC)}` : '')), 'ok', 8000);
 }
 
@@ -17657,7 +17710,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.775 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.776 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }

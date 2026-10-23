@@ -278,7 +278,9 @@ export function construireHistoriqueBail(input) {
         ancienHC: Number(h.ancienHC) || 0, nouveauHC: Number(h.nouveauHC) || 0,
         diff: Number(h.diff) || 0, irlRef: h.irlRef || '', irlVigueur: h.irlVigueur || '',
         pendingApply: !!h.pendingApply, future: !!(today && effet > today),
-        dateEffetAjustee: !!h.dateEffetAjustee, horsBail, idx
+        dateEffetAjustee: !!h.dateEffetAjustee, horsBail, idx,
+        // IRL-MOTEUR (v15.776) — révision non appliquée au jour de l'effet, en attente d'une décision.
+        aVerifier: (h.pendingApply && h.aVerifier) ? h.aVerifier : null
       }, date);
     }
   });

@@ -579,8 +579,8 @@ export function syntheseImpact(input) {
 
 // ════════════════════════════════════════════════════════════════════════════
 // RÉVISION IRL PROGRAMMÉE — le moteur IRL (`_applyPendingIRLRevisions`) ne l'applique que si le loyer vivant du lot vaut encore
-// `ancienHC`. Modifier le loyer en vigueur le change : la révision serait sautée sans un mot. La fenêtre le DIT (alerte non
-// bloquante) ; le correctif du moteur lui-même est du ressort de la session « IRL & courriers ».
+// `ancienHC`. Modifier le loyer en vigueur le change. La fenêtre le DIT avant d'enregistrer (alerte non bloquante) ; au jour
+// de l'effet, le moteur ne la saute plus : elle passe « à vérifier » avec son motif (IRL-MOTEUR, v15.776, js/core/irl-revision.js).
 // ════════════════════════════════════════════════════════════════════════════
 /**
  * @param {Array} irlHistorique DB.irlHistorique

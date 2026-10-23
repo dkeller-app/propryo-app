@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.775';
+const IMMOTRACK_VERSION = '15.776';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -8297,7 +8297,7 @@ function _pilLotLigne(l, byLotEntry, today, impayeRefs, refs) {
   const debut = (bail && bail.debut) ? String(bail.debut).slice(0, 10) : '';
   const t = (refs && refs.parRef && refs.parRef[l.ref]) || { mrh: [], equip: [], irl: [] };
   const mrhIt = t.mrh.find(x => x.mrhEtat === 'manquante') || t.mrh.find(x => x.mrhEtat === 'expiree') || t.mrh.find(x => x.mrhEtat === 'bientot') || null;
-  const irlIt = t.irl.find(x => x.irlEtat === 'applicable') || t.irl.find(x => x.irlEtat === 'preavis') || null;
+  const irlIt = t.irl.find(x => x.irlEtat === 'a-verifier') || t.irl.find(x => x.irlEtat === 'applicable') || t.irl.find(x => x.irlEtat === 'preavis') || null;
   const impIt = (pay === 'neg' && refs && refs.impayes) ? refs.impayes[l.ref] : null;
   const faits = {
     today: auj, phase, fmt: (typeof fmt === 'function') ? fmt : undefined,
@@ -8309,7 +8309,7 @@ function _pilLotLigne(l, byLotEntry, today, impayeRefs, refs) {
     entretiens: t.equip.map(x => x.severity === 'red'
       ? { libelle: x.ruleLabel || x.title, retardJours: x.retardJours, echeance: x.echeance }
       : { libelle: x.ruleLabel || x.title, retardJours: 0, joursAvant: x.joursAvant, echeance: x.echeance }),
-    revision: irlIt ? { etat: irlIt.irlEtat, dateAnniv: irlIt.dateAnniv, hc: irlIt.hc, nouveauHC: irlIt.nouveauHC, indiceManquant: !!irlIt.indiceManquant } : null,
+    revision: irlIt ? { etat: irlIt.irlEtat, dateAnniv: irlIt.dateAnniv, hc: irlIt.hc, nouveauHC: irlIt.nouveauHC, indiceManquant: !!irlIt.indiceManquant, texte: irlIt.texte || '' } : null,
     vacant: !loue, dateSortie, bail: bail ? { debut: bail.debut, sig: sig.etat, repris: bail.typeContrat === 'repris' } : null, edlEntree,
     candidats: { retenus: 0, aEtudier: 0 }, cautions: [], attestations: [], diagnostics: []
   };
@@ -9894,6 +9894,24 @@ function _computeUnifiedTodo(ctx) {
   // dejaApplique/renoncée garanti partout).
   // R-0 : un bail repris a l'achat ne sortait AUCUNE revision IRL a proposer, alors que le
   // loyer court et que la revision est due. Le bail decide, pas le cache.
+  // IRL-MOTEUR (v15.776) — une révision dont l'effet est atteint mais qui n'a PAS été appliquée (le loyer a changé
+  // depuis la validation) attend une décision : elle passe avant tout le reste du lot. Bail ouvert (même parti) :
+  // l'argent du bail en cours reste suivi.
+  scopeLogs.filter(l => typeof _lotBailOuvert !== 'function' || _lotBailOuvert(l)).forEach(l => {
+    const av = (typeof _irlAVerifierDuLot === 'function') ? _irlAVerifierDuLot(l.ref) : [];
+    const c0 = av.length ? _irlAVerifierCalc(av[0].index) : null;   // détail recalculé (jamais la marque stockée)
+    if (!c0) return;
+    const a0 = c0.av;
+    out.push({
+      type:'irl', severity:'ora', score:80, irlEtat:'a-verifier', dateAnniv:a0.effet, hc:a0.ancienHC, nouveauHC:a0.nouveauHC,
+      texte: _irlAVerifierTexte(a0),
+      title:'Révision IRL à vérifier',
+      subtitle:_logLabel(l.ref)+' — '+_irlAVerifierTexte(a0),
+      contextRef:l.ref, nom:_logLabel(l.ref),
+      actionLabel:'Vérifier',
+      actionFn:"go('loyers')"
+    });
+  });
   scopeLogs.filter(l => _lotEstLoue(l) && l.debut).forEach(l => {
     const rev = typeof computeIRLRevision === 'function' ? computeIRLRevision(l) : null;
     // Didier 16/10 — la révision s'anticipe d'un mois même quand l'indice n'est pas encore publié (ou pour la première
@@ -18419,7 +18437,7 @@ function saveBail() {
   // Sans effet sur les lecteurs (tous font `Number(x) || 0`) ni sur le cloud (store-mapping
   // `num('')` rend NULL, cas déjà prévu).
   // Étendu à hc après audit : ne protéger que ch laissait bail.hc = 0 face à un barème resté à
-  // 655 — et _applyPendingIRLRevisions refuse d'appliquer une révision quand log.hc ≠ ancienHC.
+  // 655 — et _applyPendingIRLRevisions n'applique pas une révision quand log.hc ≠ ancienHC (depuis v15.776 : « à vérifier »).
   // La révision programmée cessait donc de s'appliquer, sans autre trace qu'un warn console.
   if (typeof window !== 'undefined' && typeof window._montantSaisi === 'function' && DB.baux[ref]) {
     const _pb = DB.baux[ref];
@@ -24813,7 +24831,9 @@ function computeIRLRevision(log, opts) {
   const ancienHC     = (typeof window !== 'undefined' && typeof window._loyerBaseRevisionHC === 'function')
     ? window._loyerBaseRevisionHC(DB.loyerBareme || [], log.ref, _effBase, log.hc, debut)
     : (Number(log.hc) || 0);
-  const nouveauHC    = Math.round(ancienHC * valN / valN1 * 100) / 100;
+  // IRL-MOTEUR — LA formule (module pur IrlRevision.nouveauLoyerIrl) ; repli identique en fichier local (module absent).
+  const nouveauHC    = (typeof window !== 'undefined' && window.IrlRevision && typeof window.IrlRevision.nouveauLoyerIrl === 'function')
+    ? window.IrlRevision.nouveauLoyerIrl(ancienHC, valN1, valN) : Math.round(ancienHC * valN / valN1 * 100) / 100;
   // R5 — PROGRAMMÉE (validée, effet à venir) compte comme traitée : plus proposée, plus comptée,
   // plus d'alerte ; le loyer courant reste facturé jusqu'à la date d'effet.
   const dejaApplique = (cal.etat === 'faite' || cal.etat === 'programmee');
@@ -25460,7 +25480,8 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
   {
     const _vr = Number(_iRef && _iRef.val), _vv = Number(_iVig && _iVig.val);
     if (_vr > 0 && _vv > 0 && Number(ancienHC) > 0) {
-      const _recalc = Math.round(Number(ancienHC) * _vv / _vr * 100) / 100;
+      const _recalc = (window.IrlRevision && typeof window.IrlRevision.nouveauLoyerIrl === 'function')
+        ? window.IrlRevision.nouveauLoyerIrl(ancienHC, _vr, _vv) : Math.round(Number(ancienHC) * _vv / _vr * 100) / 100;   // IRL-MOTEUR : la formule unique
       if (Math.abs(_recalc - Number(newHC)) > 0.005) {
         showToast(`Loyer en vigueur avant le ${fd(dateEffetIso)} : ${fmt(ancienHC)} — nouveau loyer recalculé à ${fmt(_recalc)} (même variation de l'IRL).`, 'info', 9000);
         newHC = _recalc;
@@ -25548,6 +25569,18 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
 
 // v15.10 — Au boot, applique automatiquement les révisions IRL dont la date d'application
 // est arrivée (pendingApply=true + dateApplication <= today). Idempotent.
+//
+// IRL-MOTEUR (v15.776) — PLUS JAMAIS DE SAUT SILENCIEUX. La garde d'origine (« log.hc doit toujours
+// valoir ancienHC ») protégeait de deux choses : appliquer deux fois la même révision, et écraser une
+// correction faite entre la validation et l'effet. Elle le faisait en SAUTANT la révision, avec un
+// simple console.warn : l'entrée restait « en attente » à vie, le loyer vivant n'était jamais mis à
+// jour, et rien ne le disait (correction de période, avenant, saisie à la main…). Maintenant la
+// décision est prise par le module pur (IrlRevision.verifierRevisionAAppliquer), le BARÈME faisant foi :
+//   · cohérente → appliquée (jamais deux fois : un loyer vivant déjà au nouveau montant est constaté, pas réécrit) ;
+//   · incohérente → « à vérifier » : marque {code, effet, le} posée sur l'entrée (le détail est RECALCULÉ à
+//     l'affichage, jamais stocké : pas d'écriture à chaque rendu, pas de conflit de synchro), message, journal ;
+//     RIEN n'est écrit d'office (ni loyer, ni barème). Le propriétaire décide depuis Loyers › Révisions,
+//     le pilotage du parc ou l'historique du bail (_irlAVerifierAppliquer / _irlAVerifierAbandonner).
 function _applyPendingIRLRevisions() {
   if (!DB.irlHistorique || !Array.isArray(DB.irlHistorique)) return 0;
   // RETOURS 15/10 (lot 1, point 2) — les doublons existants sont nettoyés AVANT d'appliquer : un
@@ -25556,55 +25589,260 @@ function _applyPendingIRLRevisions() {
   // Constat 7 — date LOCALE : `toISOString()` rendait la veille en France (minuit local = 22/23 h
   // UTC), l'effet au 01/10 ne s'appliquait que le 02/10.
   const todayIso = _todayIsoLocal();
-  let applied = 0;
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  let applied = 0, changes = 0;
   const _irlAlertesGel = [];   // décision 25/09 : DPE F/G à la date d'effet → on prévient
+  const _aVerifierNouv = [];   // IRL-MOTEUR : révisions qui viennent de passer « à vérifier »
+  // IRL-MOTEUR — une révision « à vérifier » redatée vers une date future (« Corriger la date d'effet ») est de
+  // nouveau simplement programmée : sa marque tombe.
   for (const rev of DB.irlHistorique) {
-    if (!rev || rev._deleted || !rev.pendingApply) continue;   // une révision ANNULÉE ne s'applique jamais
-    if (!rev.dateApplication) continue;
-    if (rev.dateApplication > todayIso) continue;  // pas encore
+    if (rev && !rev._deleted && rev.aVerifier && (!rev.pendingApply || !rev.dateApplication || rev.dateApplication > todayIso)) { delete rev.aVerifier; changes++; }
+  }
+  // IRL-MOTEUR — dans l'ordre des dates d'effet : deux révisions d'un même lot atteintes ensemble (app
+  // restée fermée) s'enchaînent, la seconde ayant été calculée sur la première.
+  const _quand = h => String((h && (h.dateApplication || h.dateEffet)) || '');
+  const aTraiter = DB.irlHistorique
+    .filter(rev => rev && !rev._deleted && rev.pendingApply && rev.dateApplication && rev.dateApplication <= todayIso)   // une révision ANNULÉE ne s'applique jamais ; pas encore → rien
+    .sort((a, b) => _quand(a).localeCompare(_quand(b)));
+  // Un lot dont une révision est à vérifier : ses révisions SUIVANTES attendent la décision (elles ont été calculées
+  // sur celle-ci) — pas de fausse alerte en chaîne, rien d'appliqué par-dessus.
+  const _lotsEnAttente = new Set();
+  for (const rev of aTraiter) {
     const log = (DB.logements||[]).find(l => l && !l._deleted && l.ref === rev.ref);
-    if (!log) { rev.pendingApply = false; rev.appliedAt = todayIso; continue; }
+    if (!log) { rev.pendingApply = false; rev.appliedAt = todayIso; changes++; continue; }
     // IRL-REVISION (audit passe 2) — une révision du bail PRÉCÉDENT du lot (clé de cycle antérieure
     // au début du bail en cours) ne s'applique jamais au nouveau locataire.
     const _bCur = DB.baux[rev.ref];
     if (_bCur && _bCur.debut && rev.dateRevision && String(rev.dateRevision).slice(0, 10) < String(_bCur.debut).slice(0, 10)) continue;
-    // Vérification cohérence avant mutation : log.hc doit toujours être ancienHC.
-    if (Number(log.hc) !== Number(rev.ancienHC)) {
-      console.warn('[IRL pending apply] log.hc divergent de rev.ancienHC pour', rev.ref,
-        `(log.hc=${log.hc}, rev.ancienHC=${rev.ancienHC}) — application skip pour audit manuel`);
+    if (_lotsEnAttente.has(rev.ref)) continue;
+    const _bd = (_bCur && !_bCur._deleted && _bCur.debut) || log.debut || '';
+    const v = (IR && typeof IR.verifierRevisionAAppliquer === 'function')
+      ? IR.verifierRevisionAAppliquer({ entree: rev, bareme: DB.loyerBareme || [], ref: rev.ref, logHc: log.hc, todayIso, bailDebut: _bd })
+      : _irlVerifSansModule(rev, log);
+    if (!v || v.action === 'ignorer' || v.action === 'attendre') continue;
+    if (v.action === 'a-verifier') {
+      _lotsEnAttente.add(rev.ref);
+      const prev = rev.aVerifier || null;
+      if (!prev || prev.code !== v.aVerifier.code || prev.effet !== v.aVerifier.effet) {
+        rev.aVerifier = { code: v.aVerifier.code, effet: v.aVerifier.effet, le: todayIso };
+        changes++;
+        _aVerifierNouv.push(_logLabel(rev.ref));
+        console.warn('[IRL pending apply] révision à vérifier (rien d\'appliqué) pour', rev.ref, v.aVerifier);
+        if (typeof _auditLog === 'function') _auditLog('irl-a-verifier', 'bail', rev.ref, `${rev.ref} · ${v.aVerifier.code} · ${rev.ancienHC}→${rev.nouveauHC} eff. ${v.aVerifier.effet}`);
+      }
       continue;
     }
-    // IRL-REVISION (décision Didier 25/09) — DPE F/G constaté à la date d'effet : on PRÉVIENT, on ne
-    // bloque jamais (le barème porte déjà ce loyer depuis la validation).
-    try {
-      const _g = computeIRLRevision(log);
-      if (_g && _g.gelDpeFG && !_irlForcePourCycle(rev.ref, rev.dateRevision)) _irlAlertesGel.push(`${_logLabel(rev.ref)} (DPE ${_g.dpe})`);   // M7 (passe 4)
-    } catch (e) {}
-    log.hc = Number(rev.nouveauHC);
-    _pushLoyerTheoFromLive(log); // v15.233 B1 : application IRL auto → loyer théorique suit (Q2=b)
-    // Clé de cycle = anniversaire (dateRevision), pas la date d'effet — cf applyIRL/_baremeRecordRevision.
-    // Audit I6 — la clé de cycle seulement, jamais la date d'effet en repli (cf _baremeRecordRevision) ;
-    // et jamais une marque plus ancienne que celle en place (cycle éteint appliqué après coup).
-    if (rev.dateRevision && !(String(log.irlDerniereApplication || '') > String(rev.dateRevision))) log.irlDerniereApplication = rev.dateRevision;
-    if (DB.baux[rev.ref]) DB.baux[rev.ref].hc = Number(rev.nouveauHC);
+    // Les données ont été remises en cohérence depuis (correction annulée…) : la règle d'origine passe.
+    if (rev.aVerifier) delete rev.aVerifier;
+    if (v.action === 'appliquer') {
+      // IRL-REVISION (décision Didier 25/09) — DPE F/G constaté à la date d'effet : on PRÉVIENT, on ne
+      // bloque jamais (le barème porte déjà ce loyer depuis la validation).
+      try {
+        const _g = computeIRLRevision(log);
+        if (_g && _g.gelDpeFG && !_irlForcePourCycle(rev.ref, rev.dateRevision)) _irlAlertesGel.push(`${_logLabel(rev.ref)} (DPE ${_g.dpe})`);   // M7 (passe 4)
+      } catch (e) {}
+    }
+    // 'deja' : le loyer vivant porte déjà le nouveau montant (appliqué ailleurs) — constaté, jamais une 2ᵉ fois.
+    const _eff = String(rev.dateEffet || rev.dateApplication || '').slice(0, 10);
+    _irlAppliquerLoyerVivant(log, rev, _irlLoyerVivantApres(rev.ref, _eff, v.hc, _bd));
     rev.pendingApply = false;
     rev.appliedAt = todayIso;
-    _stamp(log);
     if (typeof _auditLog === 'function') {
-      _auditLog('irl-auto-applied', 'bail', rev.ref, `${rev.ancienHC}→${rev.nouveauHC} (anniv ${rev.dateApplication})`);
+      _auditLog('irl-auto-applied', 'bail', rev.ref, `${rev.ancienHC}→${rev.nouveauHC} (anniv ${rev.dateApplication})${v.action === 'deja' ? ' — déjà en vigueur' : ''}`);
     }
-    applied++;
+    if (v.action === 'appliquer') applied++; else changes++;
   }
-  if (applied > 0) {
+  if (applied > 0 || changes > 0) {
     saveDB();
     if (typeof showToast === 'function') {
-      showToast(`✓ ${applied} révision${applied>1?'s':''} IRL appliquée${applied>1?'s':''} automatiquement (date d'effet atteinte)`, 'ok', 5000);
+      if (applied > 0) showToast(`✓ ${applied} révision${applied>1?'s':''} IRL appliquée${applied>1?'s':''} automatiquement (date d'effet atteinte)`, 'ok', 5000);
       if (_irlAlertesGel.length) {
         showToast(`⚠ Révision appliquée sur un logement au DPE F ou G : ${_irlAlertesGel.join(', ')}. La loi Climat (art. 23) gèle le loyer de ces logements : le locataire peut refuser l'augmentation. Vérifier le DPE ou annuler par une correction.`, 'warn', 12000);
+      }
+      if (_aVerifierNouv.length) {
+        showToast(`Révision IRL à vérifier : ${_aVerifierNouv.join(', ')}. Le loyer ou le barème a changé depuis la validation : le loyer du bail n'a pas été mis à jour. Décider depuis Loyers › Révisions.`, 'warn', 12000);
       }
     }
   }
   return applied;
+}
+
+// IRL-MOTEUR — le loyer VIVANT après une révision : le nouveau montant, SAUF si une période plus récente que
+// l'effet est en vigueur aujourd'hui au barème (avenant, correction) — c'est alors elle que le lot porte.
+// Même règle pour le moteur et pour les gestes (relecture Fable 5).
+function _irlLoyerVivantApres(ref, effetIso, hc, bailDebut) {
+  const pT = (typeof window !== 'undefined' && typeof window._loyerPeriodeEnVigueurA === 'function')
+    ? window._loyerPeriodeEnVigueurA(DB.loyerBareme || [], ref, _todayIsoLocal()) : null;
+  const duBail = pT && (!bailDebut || pT.bailDebut == null || String(pT.bailDebut).slice(0, 10) === String(bailDebut).slice(0, 10));
+  return (duBail && String(pT.debut || '').slice(0, 10) > String(effetIso || '') && Number.isFinite(Number(pT.hc))) ? Number(pT.hc) : Number(hc);
+}
+
+// IRL-MOTEUR — le loyer VIVANT suit la révision appliquée (moteur au jour de l'effet, ou décision du
+// propriétaire sur une révision à vérifier) : lot, bail, loyer de référence, clé de cycle. Un seul endroit.
+function _irlAppliquerLoyerVivant(log, rev, hc) {
+  const n = Number(hc);
+  log.hc = n;
+  _pushLoyerTheoFromLive(log); // v15.233 B1 : application IRL → loyer théorique suit (Q2=b)
+  // Clé de cycle = anniversaire (dateRevision), pas la date d'effet — cf applyIRL/_baremeRecordRevision.
+  // Audit I6 — la clé de cycle seulement, jamais la date d'effet en repli (cf _baremeRecordRevision) ;
+  // et jamais une marque plus ancienne que celle en place (cycle éteint appliqué après coup).
+  if (rev.dateRevision && !(String(log.irlDerniereApplication || '') > String(rev.dateRevision))) log.irlDerniereApplication = rev.dateRevision;
+  if (DB.baux[rev.ref]) { DB.baux[rev.ref].hc = n; _stamp(DB.baux[rev.ref]); }
+  _stamp(log);
+}
+
+// IRL-MOTEUR — repli sans le module (fichier local) : la règle d'origine, sans le barème. Jamais muette :
+// une incohérence passe « à vérifier » comme ailleurs.
+function _irlVerifSansModule(rev, log) {
+  const c = x => Math.round((Number(x) || 0) * 100);
+  if (c(log.hc) === c(rev.ancienHC)) return { action: 'appliquer', hc: Number(rev.nouveauHC) };
+  if (c(log.hc) === c(rev.nouveauHC)) return { action: 'deja', hc: Number(rev.nouveauHC) };
+  return { action: 'a-verifier', aVerifier: { code: 'loyer-vivant-modifie', effet: String(rev.dateEffet || rev.dateApplication || '').slice(0, 10),
+    ancienHC: Number(rev.ancienHC) || 0, nouveauHC: Number(rev.nouveauHC) || 0, loyerActuel: Number(log.hc) || 0,
+    base: Number(log.hc) || 0, baremeEffet: null, recalcule: null } };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// IRL-MOTEUR — LA DÉCISION SUR UNE RÉVISION « À VÉRIFIER ». Logique pure testée : js/core/irl-revision.js
+// (verifierRevisionAAppliquer / propositionsAVerifier / dateDecisionAVerifier / resoudreRevisionAVerifier /
+// supprimerRevision). Gestes, jamais d'office : appliquer un des montants proposés (recalculé sur le loyer en
+// vigueur, validé, ou porté par le barème) — ou abandonner avec un motif (= « Supprimer cette révision », tracé ;
+// le cycle redevient à faire). Montrés là où le propriétaire regarde déjà : Loyers › Révisions, pilotage du parc
+// (« À regarder »), historique du bail.
+// ════════════════════════════════════════════════════════════════════════════
+/** Les révisions « à vérifier » du bail EN COURS d'un lot : [{index, entree}] (aucune sans bail courant). */
+function _irlAVerifierDuLot(ref) {
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  if (!IR || typeof IR.revisionsAVerifier !== 'function') return [];
+  const b = DB.baux && DB.baux[ref];
+  if (!b || b._deleted || !b.debut) return [];
+  return IR.revisionsAVerifier(DB.irlHistorique || [], ref, b.debut, _todayIsoLocal());
+}
+/** Le détail d'une révision à vérifier, RECALCULÉ sur les données du moment (jamais lu dans la marque stockée) :
+ *  { h, log, bail, av, props } — null si elle n'est plus à vérifier (le moteur la réexaminera). */
+function _irlAVerifierCalc(idx) {
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  const h = (DB.irlHistorique || [])[idx];
+  if (!IR || typeof IR.verifierRevisionAAppliquer !== 'function' || !h || h._deleted || !h.pendingApply || !h.aVerifier) return null;
+  const log = (DB.logements || []).find(l => l && !l._deleted && l.ref === h.ref);
+  const b = DB.baux[h.ref];
+  if (!log || !b || b._deleted || !b.debut) return null;
+  const v = IR.verifierRevisionAAppliquer({ entree: h, bareme: DB.loyerBareme || [], ref: h.ref, logHc: log.hc, todayIso: _todayIsoLocal(), bailDebut: b.debut });
+  if (!v || v.action !== 'a-verifier') return null;
+  return { h, log, bail: b, av: v.aVerifier, props: IR.propositionsAVerifier(v.aVerifier) };
+}
+/** Le motif en clair (module pur, montants au format de l'app). */
+function _irlAVerifierTexte(av) {
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  return (IR && typeof IR.texteAVerifier === 'function') ? IR.texteAVerifier(av, fmt) : '';
+}
+/** Les boutons de décision d'une entrée « à vérifier » : libellé + montant, jamais d'icône seule.
+ *  Chaque bouton porte l'identité de la révision (lot, date d'effet, montant) : un index périmé par une synchro
+ *  ne fait jamais agir sur une autre révision. */
+function _irlAVerifierBoutons(idx) {
+  const c = _irlAVerifierCalc(idx); if (!c) return '';
+  const { h, av, props } = c;
+  const id = `${Number(idx)},'${_lyQ(String(av.effet || ''))}','${_lyQ(String(h.ref || ''))}',${Number(h.nouveauHC) || 0}`;
+  const aRecalc = props.some(p => p.choix === 'recalcule');
+  const titre = (p) => p.choix === 'recalcule'
+      ? (p.prudence ? `Le loyer en vigueur (${fmt(av.base)}) atteint déjà le loyer révisé (${fmt(av.nouveauHC)}) : vérifier qu’il ne contient pas déjà la hausse avant de recalculer`
+        : `Nouveau loyer recalculé sur le loyer en vigueur (${fmt(av.base)}), avec les indices de la révision`)
+    : p.choix === 'bareme' ? 'Montant porté par le barème à la date d’effet'
+    : 'Montant validé et annoncé par la lettre de révision';
+  const lib = (p) => (p.choix === 'valide' && aRecalc ? 'Garder ' : 'Appliquer ') + fmt(p.montant);
+  return props.map((p, i) => `<button type="button" class="btn ${i === 0 && !p.prudence ? 'bp' : 'bs'} bb" onclick="_irlAVerifierAppliquer(${id},'${p.choix}')" title="${escHtml(titre(p))}">${escHtml(lib(p))}</button>`).join('')
+    + `<button type="button" class="btn bs bb" onclick="_irlAVerifierAbandonner(${id})" title="Supprimer cette révision (motif tracé) : le cycle redevient à faire">Abandonner…</button>`;
+}
+/** L'entrée ciblée par un bouton, retrouvée par son IDENTITÉ (lot, date d'effet, montant) puis revérifiée. */
+function _irlAVerifierCible(idx, effetAttendu, refAttendue, nouveauAttendu) {
+  if ((typeof _appReadOnly !== 'undefined' && _appReadOnly) || (typeof window !== 'undefined' && window.__immoHorsLigne)) {
+    showToast('Lecture seule ou hors ligne : la décision se prend une fois la connexion rétablie.', 'warn', 6000);
+    return null;
+  }
+  const nr = s => String(s == null ? '' : s).trim().toLowerCase();
+  const cents = x => Math.round((Number(x) || 0) * 100);
+  const memeRev = (x) => x && !x._deleted && x.pendingApply && x.aVerifier
+    && String(x.dateEffet || x.dateApplication || '').slice(0, 10) === String(effetAttendu || '').slice(0, 10)
+    && (refAttendue == null || nr(x.ref) === nr(refAttendue)) && (nouveauAttendu == null || cents(x.nouveauHC) === cents(nouveauAttendu));
+  const j = DB.irlHistorique || [];
+  let i = memeRev(j[idx]) ? idx : j.findIndex(memeRev);
+  if (i < 0) { showToast('L’historique a changé depuis l’affichage : rafraîchir la page.', 'warn', 6000); return null; }
+  const c = _irlAVerifierCalc(i);
+  if (!c) {
+    // La situation a changé (données remises en cohérence) : le moteur la réexamine, rien d'autre.
+    _applyPendingIRLRevisions(); refreshAllIRL(); _rPeriodPage();
+    try { if (typeof rLogFiche === 'function' && currentPage === 'log-fiche') rLogFiche(); } catch (e) {}
+    showToast('La situation a changé depuis l’affichage : la révision a été réexaminée.', 'info', 6000);
+    return null;
+  }
+  return Object.assign({ index: i }, c);
+}
+/** Appliquer un des montants proposés. Les mois déjà quittancés ne changent jamais (dateDecisionAVerifier). */
+function _irlAVerifierAppliquer(idx, effetAttendu, refAttendue, nouveauAttendu, choix) {
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  if (!IR || typeof IR.resoudreRevisionAVerifier !== 'function') { showToast('Module indisponible (rafraîchir la page)', 'err'); return; }
+  const c = _irlAVerifierCible(idx, effetAttendu, refAttendue, nouveauAttendu); if (!c) return;
+  const { index, h, log, bail, av, props } = c;
+  const p = props.find(x => x.choix === choix);
+  if (!p) { showToast('Ce choix n’est plus proposé : rafraîchir la page.', 'warn', 6000); return; }
+  const ref = h.ref, M = Number(p.montant);
+  const cents = x => Math.round((Number(x) || 0) * 100);
+  const dq = (typeof _dernierMoisQuittanceYm === 'function') ? _dernierMoisQuittanceYm(ref) : null;
+  const aPartirDu = IR.dateDecisionAVerifier(av.effet, dq);
+  const moisFr = ym => (window.ymToMoisFr ? window.ymToMoisFr(ym) : ym);
+  const msg = `Appliquer la révision IRL de ${_logLabelRef(ref)} : nouveau loyer ${fmt(M)} hors charges à partir du ${fd(aPartirDu)} ?\n\n`
+    + _irlAVerifierTexte(av) + '\n\n'
+    + (choix === 'recalcule' ? `Montant recalculé sur le loyer en vigueur avant le ${fd(av.effet)} (${fmt(av.base)}), avec les indices de la révision${h.irlRef && h.irlVigueur ? ` (${h.irlRef} → ${h.irlVigueur})` : ''}.\n` : '')
+    + (p.prudence ? `Attention : le loyer en vigueur (${fmt(av.base)}) atteint déjà le loyer révisé (${fmt(av.nouveauHC)}) ; s'il contient déjà la hausse, ce montant l'appliquerait une 2ᵉ fois.\n` : '')
+    + (choix === 'valide' && av.code === 'base-modifiee' ? `Montant validé et annoncé par la lettre, calculé sur ${fmt(av.ancienHC)}.\n` : '')
+    + (choix === 'bareme' ? `Montant porté par le barème à cette date (la validation annonçait ${fmt(av.nouveauHC)}).\n` : '')
+    + (aPartirDu !== av.effet ? `Les mois déjà quittancés (jusqu'à ${moisFr(dq)}) gardent le loyer de leur quittance.\n` : '')
+    + (cents(M) !== cents(av.nouveauHC) ? 'Le montant diffère de la lettre de révision : envoyer la lettre corrigée au locataire.' : '');
+  if (!confirm2(msg)) return;
+  // Le barème porte le dû : réécrit SEULEMENT s'il ne porte pas déjà ce montant à la date retenue.
+  const pE = (typeof window._loyerPeriodeEnVigueurA === 'function') ? window._loyerPeriodeEnVigueurA(DB.loyerBareme || [], ref, aPartirDu) : null;
+  if (!pE || cents(pE.hc) !== cents(M)) {
+    _baremeRecordRevision(log, ref, M, aPartirDu, { source: 'irl', note: h.irlVigueur || '', applyNow: false });
+  }
+  _irlAppliquerLoyerVivant(log, h, _irlLoyerVivantApres(ref, aPartirDu, M, bail.debut));
+  DB.irlHistorique[index] = IR.resoudreRevisionAVerifier(h, { choix, montant: M, base: av.base, todayIso: _todayIsoLocal(), aPartirDu,
+    par: (typeof _qeQui === 'function') ? _qeQui() : '' });
+  if (!DB.bailEvents) DB.bailEvents = [];
+  DB.bailEvents.push(_stamp({ ref, bailDebut: bail.debut || '', date: _todayIsoLocal(), type: 'correction',
+    motif: 'Révision IRL vérifiée', avant: Number(av.loyerActuel != null ? av.loyerActuel : av.ancienHC), apres: M, dateEffet: aPartirDu,
+    detail: `Révision IRL du ${fd(av.effet)} appliquée à ${fmt(M)} à partir du ${fd(aPartirDu)} après vérification (${_irlAVerifierTexte(av)})` }));
+  if (typeof _auditLog === 'function') _auditLog('irl-verifiee', 'bail', ref, `${ref} · ${av.code} · ${choix} ${M} à partir du ${aPartirDu}`);
+  saveDB(); refreshAllIRL(); _rPeriodPage();
+  try { if (typeof rLogFiche === 'function' && currentPage === 'log-fiche') rLogFiche(); } catch (e) {}
+  showToast(`✓ Révision appliquée : ${fmt(M)}/mois à partir du ${fd(aPartirDu)}.`, 'ok', 6000);
+  if (cents(M) !== cents(av.nouveauHC)) { try { previewIRLLetter(ref); } catch (e) { console.warn('[IRL] lettre corrigée', e); } }
+}
+/** Abandonner une révision à vérifier : « Supprimer cette révision », motif obligatoire et tracé. Le loyer en
+ *  vigueur avant l'effet (corrigé s'il l'a été) est reposé à la date d'effet — aucune hausse orpheline au barème. */
+function _irlAVerifierAbandonner(idx, effetAttendu, refAttendue, nouveauAttendu) {
+  const IR = (typeof window !== 'undefined') ? window.IrlRevision : null;
+  if (!IR || typeof IR.supprimerRevision !== 'function') { showToast('Module indisponible (rafraîchir la page)', 'err'); return; }
+  const c = _irlAVerifierCible(idx, effetAttendu, refAttendue, nouveauAttendu); if (!c) return;
+  const { index, h, av } = c;
+  const ref = h.ref;
+  const repris = (av.base != null && av.base > 0) ? Number(av.base) : Number(h.ancienHC);
+  const inp = Object.assign(_histoIrlSupprInput(index, effetAttendu, nouveauAttendu), {
+    loyerReprise: repris, forcerReprise: true, note: 'Révision IRL abandonnée'
+  });
+  const a = IR.analyserSuppressionRevision(inp);
+  if (!a.ok) { showToast(a.erreur, 'err', 7000); return; }
+  const moisFr = ym => (window.ymToMoisFr ? window.ymToMoisFr(ym) : ym);
+  const effetTxt = a.nature === 'doublon'
+    ? 'Une autre révision à la même date reste enregistrée : le loyer et le barème ne changent pas.'
+    : (a.moisQuittancesConserves
+      ? `Les mois déjà quittancés (jusqu'à ${moisFr(inp.dernierMoisQuittanceYm)}) gardent le loyer de leur quittance. À partir du ${fd(a.reprise)}, le loyer revient à ${fmt(repris)}.`
+      : `À partir du ${fd(a.reprise)}, le loyer revient à ${fmt(repris)} : le nouveau loyer ne s'applique pas.`);
+  const motif = (typeof window.prompt === 'function') ? window.prompt(`Abandonner la révision IRL de ${_logLabelRef(ref)} au ${fd(av.effet)} (${fmt(av.ancienHC)} → ${fmt(av.nouveauHC)}) ?\n\n`
+    + _irlAVerifierTexte(av) + '\n\n' + effetTxt + '\nSi la lettre a été envoyée, prévenir le locataire.\n'
+    + 'La révision de ce cycle redevient à faire (article 17-1 : un an pour la demander).\n\nMotif (obligatoire, tracé dans l’historique du bail) :', '') : null;
+  if (motif == null) return;
+  if (!String(motif).trim()) { showToast('Motif obligatoire : l’abandon est tracé dans l’historique du bail.', 'warn', 6000); return; }
+  _histoIrlSupprAppliquer(Object.assign(inp, { motif: String(motif).trim() }), a, { abandon: true, repris });
 }
 
 // RETOURS 15/10 (lot 1, point 2) — MIGRATION DE DONNÉES idempotente : une seule entrée vivante par

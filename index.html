@@ -10,7 +10,7 @@
      ⚠️ tout nouvel endpoint réseau DOIT être ajouté ici. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://xcbtashflclswyiyvfgn.supabase.co; connect-src 'self' https://xcbtashflclswyiyvfgn.supabase.co wss://xcbtashflclswyiyvfgn.supabase.co https://bail-sign-relay.didierkeller.workers.dev https://api.insee.fr https://recherche-entreprises.api.gouv.fr https://api-adresse.data.gouv.fr https://errial.georisques.gouv.fr https://www.georisques.gouv.fr https://data.ademe.fr https://gmail.googleapis.com https://www.googleapis.com; frame-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Propryo v15.775</title>
+<title>Propryo v15.776</title>
 <!-- F9.2 (audit sécu) anti-clickjacking : GitHub Pages ne pose pas X-Frame-Options et frame-ancestors
      est ignoré en <meta> → garde JS. Si l'app est chargée dans une iframe (tentative de clickjacking
      sur l'UI authentifiée), on la remet en top-level ; si window.top est cross-origin (accès refusé),
@@ -124,7 +124,7 @@ window.ensurePdfLibs=(function(){var p=null;return function(){
 <link rel="preload" href="css/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="css/fonts/schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!-- LOT 1 : les 5 familles Google Fonts et leurs 2 preconnect sont retirés — Inter et Schibsted Grotesk sont vendorisées dans css/fonts/, déclarées en @font-face en tête de css/main.css. Règle projet : aucun CDN au runtime. -->
-<link rel="stylesheet" href="css/main.css?v=15.775">
+<link rel="stylesheet" href="css/main.css?v=15.776">
 <link rel="stylesheet" id="imsb-style-link" href="css/login.css?v=cf8123a4">
 <!-- modulepreload:begin (genere par tools/stamp-app-parts.mjs - ne pas editer a la main) -->
 <link rel="modulepreload" href="js/vendor/supabase-js-2.110.2.esm.js">
@@ -272,7 +272,7 @@ window.ensurePdfLibs=(function(){var p=null;return function(){
 <!-- BAIL-EN-COURS-SIGNE-HORS-PROPRYO : etat de signature d'un bail (non / partiel / electronique / externe), window.BailSignatureEtat, source js/core/bail-signature-etat.js. -->
 <script src="js/helpers/bail-signature-etat.global.js?v=e58cc36c" defer></script>
 <!-- MATRICE-ACCUEIL (16/10) : « Pilotage du parc » de l'Accueil, qu'y a-t-il à piloter sur ce lot (window.PilotageLot, source js/core/pilotage-lot.js). -->
-<script src="js/helpers/pilotage-lot.global.js?v=e1f4b465" defer></script>
+<script src="js/helpers/pilotage-lot.global.js?v=553e91f3" defer></script>
 <!-- PARAPHE-UNIQUE : contr�le � onglet p�rim� � avant de signer / r�g�n�rer le PDF d'un bail sign� (window.VersionApp, source js/core/version-app.js). -->
 <script src="js/helpers/version-app.global.js?v=97798663" defer></script>
 <!-- BOOT GATE (cutover Connexion B) : empêche de voir l'app AVANT l'overlay de login cloud. Dès le 1er
@@ -388,7 +388,7 @@ var b=document.getElementById('imsb-submit');if(b){b.disabled=false;b.textConten
     <span class="sb-logo-icon"><!-- Logo validé (charte) : carré contour + point corail, toujours corail --><svg viewBox="0 0 32 32" width="24" height="24" fill="none" aria-hidden="true"><rect x="1.76" y="1.76" width="28.48" height="28.48" rx="7.68" fill="none" stroke="#ff5a3c" stroke-width="3.52"/><circle cx="21.34" cy="21.34" r="4.1" fill="#ff5a3c"/></svg></span>
     <div class="sb-logo-text">
       <strong>Propryo</strong>
-      <em>v15.775</em>
+      <em>v15.776</em>
     </div>
     <!-- v15.26 : boutons utilitaires en haut sidebar.
          v15.38 : bouton font-size supprimé sur demande user (cf footer V4 dashboard). -->
@@ -1063,6 +1063,9 @@ var b=document.getElementById('imsb-submit');if(b){b.disabled=false;b.textConten
           white-space:nowrap;border:1px solid transparent;line-height:1.5}
         #p-loyers .ly2-p.ok{background:var(--pos-soft);color:var(--pos);border-color:color-mix(in srgb,var(--pos) 35%,transparent)}
         #p-loyers .ly2-p.wa{background:var(--warn-soft);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+        #p-loyers .ly2-irlv{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}   /* IRL-MOTEUR : gestes d'une révision à vérifier */
+        #p-loyers .ly2-r .c2:has(.ly2-irlvm){white-space:normal;text-overflow:clip;line-height:1.4}   /* le motif se lit en entier */
+        @media (max-width:767px){#p-loyers .ly2-irlv{justify-content:flex-start;width:100%} #p-loyers .ly2-irlv .btn{min-height:44px;flex:1 1 auto;justify-content:center}}
         #p-loyers .ly2-p.er{background:var(--neg-soft);color:var(--neg);border-color:color-mix(in srgb,var(--neg) 35%,transparent)}
         #p-loyers .ly2-p.nu{background:var(--sur2);color:var(--t3);border-color:var(--bor)}
         #p-loyers .ly2-p.ac{background:var(--acc-bg);color:var(--acc);border-color:color-mix(in srgb,var(--acc) 35%,transparent)}
@@ -4751,8 +4754,8 @@ tr.cand-row-new td{background:linear-gradient(90deg,rgba(59,126,246,.06),transpa
 <!-- BASCULE SUPABASE (P3) — config publique (clé anon ; RLS protège) + entrée sous interrupteur.
      INERTE par défaut sur l'app de tous les jours ; ne s'active QUE via un opt-in explicite. -->
 <script src="js/app/supabase-config.js?v=63ebc26f" defer></script>
-<script src="js/app/app-part1.js?v=1a4dfa58" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part1')"></script>
-<script src="js/app/app-part2.js?v=516a372f" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part2')"></script>
+<script src="js/app/app-part1.js?v=f8edafca" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part1')"></script>
+<script src="js/app/app-part2.js?v=a95d9f41" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part2')"></script>
 <script src="js/app/app-part3.js?v=58cfb975" data-inline-part defer onerror="window.__immoPartFail&&window.__immoPartFail('app-part3')"></script>
 
 <!-- ── v15.12 Sprint 12 GESTION DG : modale restitution DG ── -->
@@ -5351,6 +5354,11 @@ tr.cand-row-new td{background:linear-gradient(90deg,rgba(59,126,246,.06),transpa
 .hl-move .pct{font-size:11px;font-weight:700;color:var(--grn)}
 .hl-foot{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;align-items:center}
 .hl-foot .meta{font-size:11px;color:var(--t3)}
+/* IRL-MOTEUR (v15.776) — révision IRL non appliquée, à vérifier : le motif et les gestes sur la carte du bail. */
+.hl-averif{margin-top:8px;padding:8px 10px;border-radius:var(--r);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);color:var(--t1)}
+.hl-averif-a{gap:8px}
+.hl-averif-a .btn{min-height:36px}
+@media(max-width:767px){.hl-averif-a .btn{min-height:44px;flex:1 1 auto;justify-content:center}}
 .hl-period{position:relative;margin:2px 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hl-period .tag{margin-left:-30px;background:var(--sur3);border:1px solid var(--bor);color:var(--t2);
   font-size:11.5px;font-weight:700;border-radius:999px;padding:4px 13px;font-variant-numeric:tabular-nums;white-space:nowrap}

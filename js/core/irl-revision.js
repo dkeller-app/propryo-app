@@ -290,7 +290,9 @@ export function analyserSuppressionRevision(input) {
   // Révision appliquée sans sa période au barème à la date d'effet (révision ancienne re-datée, période
   // corrigée à la main, validée hors connexion) : remettre l'ancien loyer sur le lot sans toucher au dû
   // ferait diverger l'affichage et le dû — refus explicite, comme « Corriger la date d'effet ».
-  if (nature === 'appliquee' && reprise === effet && bareme && !perIrl) {
+  // `forcerReprise` (abandon d'une révision « à vérifier ») : le loyer d'avant est reposé à la date d'effet quelle que soit
+  // la période qui y figure (corrigée à la main, ou absente) — jamais de période révisée orpheline.
+  if (nature === 'appliquee' && reprise === effet && bareme && !perIrl && !i.forcerReprise) {
     return { ok: false, erreur: 'Période du barème introuvable pour cette révision — utiliser « Ajouter une période ».' };
   }
   return { ok: true, nature, entree: h, effet, reprise, moisQuittancesConserves: quittance, jumelle: null };
@@ -306,6 +308,10 @@ export function analyserSuppressionRevision(input) {
  *                   le dernier mois quittancé : ces mois gardent le loyer révisé (I-1).
  * Pure : aucune donnée reçue n'est mutée.
  * @param {Object} input celui de analyserSuppressionRevision + {bareme, nowIso, logHc, chRepli}
+ *   + (révision « à vérifier » abandonnée) `loyerReprise` : le loyer qui reprend, s'il n'est plus `ancienHC`
+ *   (loyer d'avant l'effet corrigé entre-temps) ; `forcerReprise` : ce loyer est reposé à la date d'effet même si
+ *   la période qui y figure n'est pas la période IRL (révisé corrigé à la main) — aucune hausse ne reste au barème
+ *   pour un cycle redevenu « à faire » ; `motif` / `note` : la trace de l'abandon.
  * @returns {{ok:false, erreur:string} | {ok:true, nature, entree, effet, reprise, moisQuittancesConserves,
  *          irlHistorique:Array, bareme:Array, logHc:number|null, marqueCycle:string}}
  *   logHc : le loyer vivant à poser (null = ne pas toucher) ; marqueCycle : la clé de cycle à
@@ -319,14 +325,23 @@ export function supprimerRevision(input) {
   const idx = Number(i.index);
   const h = a.entree;
   const stamp = String(i.nowIso || (_ymd(i.todayIso) + 'T00:00:00.000Z'));
+  const motif = String(i.motif || '').trim();
   const irlHistorique = i.irlHistorique.map((x, k) => (k === idx
-    ? { ...x, _deleted: true, _deletedAt: stamp, _modifiedAt: stamp, _supprimeeLe: _ymd(i.todayIso) } : x));
+    ? { ...x, _deleted: true, _deletedAt: stamp, _modifiedAt: stamp, _supprimeeLe: _ymd(i.todayIso), ...(motif ? { _abandonMotif: motif } : {}) } : x));
   let bareme = Array.isArray(i.bareme) ? i.bareme : [];
   let logHc = null;
   if (a.nature !== 'doublon') {
-    const ancien = Number(h.ancienHC) || 0;
+    const ancien = (i.loyerReprise != null && Number.isFinite(Number(i.loyerReprise))) ? Number(i.loyerReprise) : (Number(h.ancienHC) || 0);
+    const note = String(i.note || '') || 'Révision IRL supprimée';
     if (a.reprise === a.effet) {
-      bareme = _loyerAvantALaMemeDate(bareme, want, a.effet, ancien, 'Révision IRL supprimée');
+      const b1 = _loyerAvantALaMemeDate(bareme, want, a.effet, ancien, note);
+      const pE = (b1 === bareme && i.forcerReprise) ? periodeEnVigueurA(bareme, i.ref, a.effet) : null;
+      if (pE && _cents(pE.hc) !== _cents(ancien)) {
+        bareme = appliquerNouvellePeriode(bareme, {
+          ref: pE.ref || i.ref, debut: a.effet, hc: ancien, ch: Number(pE.ch) || 0, source: 'manuel',
+          bailDebut: pE.bailDebut || (_ok(i.bailDebut) ? _ymd(i.bailDebut) : undefined), note
+        });
+      } else bareme = b1;
     } else {
       // Mois quittancés : la révision reste au barème jusqu'à la veille de la reprise.
       const enVigueur = periodeEnVigueurA(bareme, i.ref, a.reprise);
@@ -334,7 +349,7 @@ export function supprimerRevision(input) {
       bareme = appliquerNouvellePeriode(bareme, {
         ref: (enVigueur && enVigueur.ref) || i.ref, debut: a.reprise, hc: ancien,
         ch: enVigueur ? (Number(enVigueur.ch) || 0) : (Number(i.chRepli) || 0),
-        source: 'manuel', bailDebut: bd, note: 'Révision IRL supprimée — mois déjà quittancés inchangés'
+        source: 'manuel', bailDebut: bd, note: note + ' — mois déjà quittancés inchangés'
       });
     }
     if (i.logHc != null && _cents(i.logHc) === _cents(h.nouveauHC)) logHc = ancien;
@@ -345,4 +360,202 @@ export function supprimerRevision(input) {
     .filter((x) => x && !x._deleted && _nr(x.ref) === want && _ok(x.dateRevision) && (!deb || _ymd(x.dateRevision) >= deb))
     .map((x) => _ymd(x.dateRevision)).sort().pop() || '';
   return { ...a, irlHistorique, bareme, logHc, marqueCycle };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// RÉVISION « À VÉRIFIER » — chantier IRL-MOTEUR (v15.776).
+// Avant : au jour de l'effet, _applyPendingIRLRevisions SAUTAIT EN SILENCE une révision dont « l'ancien
+// loyer » ne valait plus le loyer du lot (correction de période, avenant, saisie à la main) : un
+// `console.warn`, rien à l'écran, l'entrée « en attente » à vie, le loyer vivant jamais mis à jour.
+// Ce que la garde protégeait (v15.10) reste protégé : jamais deux fois la même révision, jamais
+// une correction volontaire écrasée. Mais une révision qui ne passe pas la garde n'est plus perdue :
+// elle passe « à vérifier », avec son motif, et le propriétaire décide (appliquer / abandonner).
+// Rien n'est appliqué d'office : le moteur n'écrit ni le barème ni le loyer d'une révision à vérifier.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+const _veille = (iso) => {
+  const d = new Date(_ymd(iso) + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+const _montant = (v) => (v == null || (typeof v === 'string' && v.trim() === '') || !Number.isFinite(Number(v))) ? null : Number(v);
+const _r2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * LE nouveau loyer d'une révision IRL : base × indice en vigueur ÷ indice de référence, au centime.
+ * Formule unique du moteur (calcul de la révision, recalcul à la validation, révision à vérifier).
+ * @returns {number|null} null si la base ou un indice manque
+ */
+export function nouveauLoyerIrl(base, irlRefVal, irlVigueurVal) {
+  const b = _montant(base), r = Number(irlRefVal), v = Number(irlVigueurVal);
+  if (b == null || !(r > 0) || !(v > 0)) return null;
+  return Math.round(b * v / r * 100) / 100;
+}
+
+/**
+ * Au jour de l'effet : cette révision programmée peut-elle s'appliquer telle quelle ?
+ * Le BARÈME fait foi (c'est lui qui fixe le dû) : la révision est cohérente si le loyer en vigueur la
+ * VEILLE de l'effet vaut toujours sa base (`ancienHC`) et si le barème porte bien son nouveau loyer à
+ * la date d'effet. Le loyer vivant du lot (`logHc`) dit ensuite s'il reste à l'écrire (= base) ou s'il
+ * l'est déjà (= nouveau loyer : jamais deux fois). Sans barème pour ce lot (fichier local, données
+ * anciennes) : seule la règle d'origine (loyer vivant = base) vaut.
+ *
+ * @param {{entree:Object, bareme?:Array, ref?:string, logHc:*, todayIso:string, bailDebut?:string}} input
+ * @returns {{action:'ignorer'} | {action:'attendre'} | {action:'appliquer', hc:number} | {action:'deja', hc:number}
+ *   | {action:'a-verifier', aVerifier:{code:'base-modifiee'|'loyer-revise-modifie'|'absente-bareme'|'loyer-vivant-modifie',
+ *       effet:string, ancienHC:number, nouveauHC:number, loyerActuel:number|null, base:number|null,
+ *       baremeEffet:number|null, recalcule:number|null}}}
+ *   recalcule = le nouveau loyer sur la base EN VIGUEUR (barème, sinon loyer du lot), avec les indices de la révision.
+ */
+export function verifierRevisionAAppliquer(input) {
+  const i = input || {};
+  const h = i.entree;
+  if (!_vivante(h) || !h.pendingApply) return { action: 'ignorer' };
+  const quand = _ymd(h.dateApplication) || _ymd(h.dateEffet);
+  const effet = _effetDe(h);
+  const today = _ymd(i.todayIso);
+  if (!_ok(quand) || !_ok(effet) || !_ok(today)) return { action: 'ignorer' };
+  if (quand > today) return { action: 'attendre' };
+  const anc = Number(h.ancienHC) || 0, nouv = Number(h.nouveauHC) || 0;
+  const live = _montant(i.logHc);
+  const ref = i.ref != null ? i.ref : h.ref;
+  const bd = _ok(i.bailDebut) ? _ymd(i.bailDebut) : null;
+  // Même borne que la base d'une révision (baseRevisionHC) : une période d'un AUTRE bail ne compte pas.
+  const duBail = (p) => (p && (bd == null || p.bailDebut == null || _ymd(p.bailDebut) === bd)) ? p : null;
+  const bareme = Array.isArray(i.bareme) ? i.bareme : [];
+  const pV = duBail(periodeEnVigueurA(bareme, ref, _veille(effet)));
+  const pE = duBail(periodeEnVigueurA(bareme, ref, effet));
+  const base = pV ? _montant(pV.hc) : null;
+  const baremeEffet = pE ? _montant(pE.hc) : null;
+  const baseModifiee = base != null && _cents(base) !== _cents(anc);
+  const reviseModifie = baremeEffet != null && _cents(baremeEffet) !== _cents(nouv);
+  if (!baseModifiee && !reviseModifie) {
+    if (live != null && _cents(live) === _cents(anc)) return { action: 'appliquer', hc: nouv };
+    if (live != null && _cents(live) === _cents(nouv)) return { action: 'deja', hc: nouv };
+    // Loyer du lot non renseigné : le barème (cohérent, et portant la révision) fait foi.
+    if (live == null && baremeEffet != null) return { action: 'appliquer', hc: nouv };
+    // Relecture Fable (2) — une période PLUS RÉCENTE que l'effet (avenant, correction) porte déjà le loyer du lot :
+    // la révision est au barème, le loyer vivant a suivi la suite — constaté, rien à décider.
+    const pT = duBail(periodeEnVigueurA(bareme, ref, today));
+    if (live != null && pT && _ymd(pT.debut) > effet && _cents(pT.hc) === _cents(live)) return { action: 'deja', hc: nouv };
+  }
+  // Relecture adverse (1) — la base a été portée À LA MAIN au nouveau loyer avant l'effet (barème cohérent à l'effet) :
+  // la révision est déjà en place. La recalculer l'appliquerait une 2ᵉ fois.
+  if (baseModifiee && _cents(base) === _cents(nouv) && (baremeEffet == null || _cents(baremeEffet) === _cents(nouv))) {
+    return { action: 'deja', hc: nouv };
+  }
+  let code = 'loyer-vivant-modifie';
+  if (baseModifiee) code = 'base-modifiee';
+  else if (reviseModifie) code = (_cents(baremeEffet) === _cents(anc)) ? 'absente-bareme' : 'loyer-revise-modifie';
+  const b = base != null ? base : live;
+  return { action: 'a-verifier', aVerifier: {
+    code, effet, ancienHC: anc, nouveauHC: nouv, loyerActuel: live, base: b, baremeEffet,
+    // Relecture adverse (8) — jamais un « nouveau loyer » calculé sur une base nulle (barème lacunaire comblé à 0).
+    recalcule: (b != null && b > 0) ? nouveauLoyerIrl(b, h.irlRefVal, h.irlVigueurVal) : null
+  } };
+}
+
+/**
+ * Les montants que le propriétaire peut retenir pour une révision à vérifier, le PREMIER étant celui
+ * que le moteur propose. Abandonner est toujours possible en plus (« Supprimer cette révision »).
+ *   · 'recalcule' : le nouveau loyer recalculé sur la base en vigueur (base corrigée entre-temps) ;
+ *   · 'valide'    : le montant validé (et annoncé par la lettre), tel quel ;
+ *   · 'bareme'    : le montant que le barème porte à la date d'effet (révisé corrigé à la main) — jamais écrasé.
+ * @returns {Array<{choix:'recalcule'|'valide'|'bareme', montant:number}>}
+ */
+export function propositionsAVerifier(av) {
+  if (!av) return [];
+  if (av.code === 'loyer-revise-modifie') return av.baremeEffet != null ? [{ choix: 'bareme', montant: av.baremeEffet }] : [];
+  const out = [];
+  // La base en vigueur atteint déjà le loyer révisé (hausse faite à la main ?) : le recalcul n'est plus LA proposition
+  // (il ajouterait une hausse à une hausse) — il reste possible, jamais en premier (relecture adverse 1).
+  const auDessus = av.base != null && _cents(av.base) >= _cents(av.nouveauHC);
+  if (av.code !== 'absente-bareme' && av.recalcule != null && _cents(av.recalcule) !== _cents(av.nouveauHC)) {
+    out.push(auDessus ? { choix: 'recalcule', montant: av.recalcule, prudence: true } : { choix: 'recalcule', montant: av.recalcule });
+  }
+  // Jamais une « révision » qui BAISSERAIT le loyer en vigueur (relecture Fable 4).
+  if (!(av.base != null && _cents(av.nouveauHC) < _cents(av.base))) out.push({ choix: 'valide', montant: av.nouveauHC });
+  // Ce qui est proposé en premier n'est jamais un geste « avec prudence ».
+  return out.sort((x, y) => (x.prudence ? 1 : 0) - (y.prudence ? 1 : 0));
+}
+
+/**
+ * La date à partir de laquelle un montant décidé pour une révision « à vérifier » est posé au barème : la date
+ * d'effet, sauf si des mois sont déjà QUITTANCÉS depuis — alors le 1er du mois qui suit le dernier mois quittancé
+ * (même règle que « Supprimer cette révision » : les mois quittancés gardent le loyer de leur quittance).
+ * @param {string} effet 'AAAA-MM-JJ'
+ * @param {string|null} dernierMoisQuittanceYm 'AAAA-MM'
+ */
+export function dateDecisionAVerifier(effet, dernierMoisQuittanceYm) {
+  const eff = _ymd(effet);
+  const dq = /^\d{4}-\d{2}$/.test(String(dernierMoisQuittanceYm || '')) ? String(dernierMoisQuittanceYm) : '';
+  return (_ok(eff) && dq && eff.slice(0, 7) <= dq) ? _premierDuMoisSuivant(dq + '-01') : eff;
+}
+
+const _fmtDefaut = (n) => (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+
+/**
+ * Le motif, en clair (ton neutre) : ce qui a changé depuis la validation, et pourquoi rien n'a été appliqué.
+ * @param {Object} av l'objet `aVerifier`
+ * @param {(n:number)=>string} [fmt] mise en forme des montants
+ */
+export function texteAVerifier(av, fmt) {
+  if (!av) return '';
+  const F = typeof fmt === 'function' ? fmt : _fmtDefaut;
+  const eff = _frDate(av.effet);
+  // Relecture adverse (3) — dire ce qui est RÉELLEMENT facturé : le barème porte, depuis la validation, un montant à la
+  // date d'effet ; seul le loyer du bail (fiche, bail) n'a pas été mis à jour.
+  const factu = av.baremeEffet != null ? ` Le barème facture ${F(av.baremeEffet)} depuis cette date${av.loyerActuel != null ? `, le loyer du bail reste ${F(av.loyerActuel)}` : ''}.` : '';
+  switch (av.code) {
+    case 'base-modifiee':
+      return `Révision du ${eff} à vérifier : le loyer en vigueur avant cette date vaut ${F(av.base)}, la révision a été calculée sur ${F(av.ancienHC)}.` + factu;
+    case 'loyer-revise-modifie':
+      return `Révision du ${eff} à vérifier : le barème prévoit ${F(av.baremeEffet)} à cette date, la révision annonçait ${F(av.nouveauHC)}.`;
+    case 'absente-bareme':
+      return `Révision du ${eff} à vérifier : le barème ne porte plus le nouveau loyer de ${F(av.nouveauHC)} à cette date (il facture ${F(av.baremeEffet)}).`;
+    default:
+      return `Révision du ${eff} à vérifier : le loyer du bail vaut ${av.loyerActuel != null ? F(av.loyerActuel) : 'un montant non renseigné'}, la révision attendait ${F(av.ancienHC)}.` + factu;
+  }
+}
+
+/**
+ * Les révisions « à vérifier » d'un lot (vivantes, encore en attente, motif posé par le moteur),
+ * du bail en cours si `bailDebut` est donné. Triées par date d'effet.
+ * @returns {Array<{index:number, entree:Object}>}
+ */
+export function revisionsAVerifier(journal, ref, bailDebut, todayIso) {
+  const want = _nr(ref);
+  const deb = _ok(bailDebut) ? _ymd(bailDebut) : '';
+  const today = _ok(todayIso) ? _ymd(todayIso) : '';
+  const out = [];
+  (Array.isArray(journal) ? journal : []).forEach((h, index) => {
+    if (!_vivante(h) || !h.pendingApply || !h.aVerifier || _nr(h.ref) !== want) return;
+    if (deb && _ok(h.dateRevision) && _ymd(h.dateRevision) < deb) return;
+    // Redatée vers une date future (« Corriger la date d'effet ») : plus à vérifier, de nouveau programmée.
+    if (today && (_ymd(h.dateApplication) || _effetDe(h)) > today) return;
+    out.push({ index, entree: h });
+  });
+  return out.sort((a, b) => _effetDe(a.entree).localeCompare(_effetDe(b.entree)));
+}
+
+/**
+ * L'entrée du journal une fois la révision vérifiée et appliquée par le propriétaire (copie, rien n'est muté) :
+ * plus en attente, montants retenus, et la trace de la vérification (`verification` : choix, date, auteur,
+ * motif, montants d'avant). Un recalcul sur une base corrigée change aussi la base (`ancienHC`).
+ * @param {Object} entree l'entrée « à vérifier »
+ * @param {{choix:'recalcule'|'valide'|'bareme', montant:number, base?:number, todayIso:string, par?:string, aPartirDu?:string}} o
+ */
+export function resoudreRevisionAVerifier(entree, o) {
+  const p = o || {};
+  const m = Number(p.montant);
+  const today = _ymd(p.todayIso);
+  const anc = (p.choix === 'recalcule' && _montant(p.base) != null) ? Number(p.base) : (Number(entree.ancienHC) || 0);
+  const out = {
+    ...entree, ancienHC: anc, nouveauHC: m, diff: _r2(m - anc), pendingApply: false, appliedAt: today,
+    verification: { le: today, choix: p.choix, par: p.par || '', motif: (entree.aVerifier && entree.aVerifier.code) || '',
+      ...(_ok(p.aPartirDu) && _ymd(p.aPartirDu) !== _effetDe(entree) ? { aPartirDu: _ymd(p.aPartirDu) } : {}),
+      avant: { ancienHC: Number(entree.ancienHC) || 0, nouveauHC: Number(entree.nouveauHC) || 0 } }
+  };
+  delete out.aVerifier;
+  return out;
 }

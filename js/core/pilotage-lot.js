@@ -87,7 +87,8 @@ const g = (geste, libelle) => ({ geste, libelle })
  *   enPlace       : le locataire est entré dans les lieux (bail loué, début ≤ aujourd'hui)
  *   assurance     : null | { etat:'manquante'|'expiree'|'bientot', echeance? }   (moteur des alertes ; « bientôt » ≤ 15 j montré)
  *   entretiens    : [{ libelle, retardJours, joursAvant?, echeance? }]      (en retard, ou à venir : montré à 15 j)
- *   revision      : null | { etat:'applicable'|'preavis', dateAnniv, hc, nouveauHC, indiceManquant? }   (préavis montré à 30 j)
+ *   revision      : null | { etat:'applicable'|'preavis'|'a-verifier', dateAnniv, hc, nouveauHC, indiceManquant?, texte? }   (préavis montré à 30 j ;
+ *                   'a-verifier' = révision dont l'effet est atteint mais NON appliquée, texte = son motif — montrée même locataire parti)
  *   vacant        : le lot n'est pas loué
  *   dateSortie    : date de sortie du congé reçu ('' sinon)
  *   candidats     : { retenus:number, aEtudier:number }
@@ -106,6 +107,10 @@ export function casesDuLot(f) {
     const ym = String(o.impaye.depuisYm || '')
     const mois = /^\d{4}-\d{2}$/.test(ym) ? ' depuis ' + MOIS[Number(ym.slice(5, 7)) - 1] + (ym.slice(0, 4) !== today.slice(0, 4) ? ' ' + ym.slice(0, 4) : '') : ''
     out.loyer = [ligne('Impayé : ' + fmt(o.impaye.reste) + mois + '.', [g('loyer', 'Voir le suivi du loyer')])]
+  }
+  // IRL-MOTEUR (v15.776) — une révision à vérifier attend une décision, que le locataire soit encore là ou non (bail ouvert).
+  if (o.revision && o.revision.etat === 'a-verifier') {
+    out.irl = [ligne(String(o.revision.texte || ('Révision du ' + dateFr(o.revision.dateAnniv) + ' à vérifier.')), [g('irl', 'Vérifier la révision')])]
   }
   if (o.enPlace) {
     const A = ANTICIPATION_JOURS
@@ -129,7 +134,7 @@ export function casesDuLot(f) {
       : ligne(String(x.libelle) + ' : en retard' + (Number(x.retardJours) > 0 ? ' de ' + Math.round(x.retardJours) + ' jours' : '') + '.', [g('entr', 'Planifier l’entretien')]))
     // Révision : due, ou à préparer dans les 30 jours avant la date de révision.
     const r = o.revision
-    if (r) {
+    if (r && r.etat !== 'a-verifier') {
       const j = jour(r.dateAnniv) ? ecartJours(today, r.dateAnniv) : null
       const montrer = r.etat === 'preavis' ? (j != null && j <= A.irl) : true   // due (applicable)
       if (montrer) {

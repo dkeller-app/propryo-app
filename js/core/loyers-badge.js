@@ -4,7 +4,7 @@
 // Le compteur = EXACTEMENT les lignes ACTIONNABLES de l'écran Loyers :
 //   • quittances demandées PRÊTES à éditer (case cochée ET au moins un mois à quittancer),
 //   • lots pas à jour (loyer/charges en retard),
-//   • révisions à préparer (à-préparer + en-retard).
+//   • révisions à préparer (à-préparer + en-retard) et à vérifier (IRL-MOTEUR).
 // N'y entrent JAMAIS : les NON-RÉVISABLES (gelé DPE F/G, bail < 1 an, indice non publié → `muets`)
 // ni les révisions PERDUES (prescription art. 17-1 → `perdues`). Rien à y faire, rien à compter.
 // 0 → pas de pastille (la surface d'affichage masque la pastille quand le compte est nul).
@@ -36,6 +36,7 @@ export function loyersBadgeBreakdown(etats, rev) {
   const pasAJour = e.filter(x => x && x.retard && x.retard.enRetard).length;
   // `muets` (gelé/trop-jeune/indice) et `perdues` (prescription) ne sont PAS sommés : ils vivent
   // dans les blocs « non révisables » / « IRL non appliquées », aucun geste demandé ici (I15).
-  const revisions = ((r.aPreparer || []).length) + ((r.enRetard || []).length);
+  // IRL-MOTEUR (v15.776) — une révision « à vérifier » (effet atteint, non appliquée) attend une décision : comptée.
+  const revisions = ((r.aPreparer || []).length) + ((r.enRetard || []).length) + ((r.aVerifier || []).length);
   return { quittances, pasAJour, revisions };
 }
