@@ -4921,6 +4921,13 @@ textarea.field-modified-since-sig{
   .filters .inp, #p-dashboard select.inp{flex:1 1 auto;min-width:130px}
 }
 
+/* MOBILE-BAIL — rangée « Civilité & nom complet » du wizard de bail (renderBailLocs).
+   Base PC/tablette : select civilité étroit (72 px) + nom en flex, rendu INCHANGÉ (ex-styles en ligne).
+   Le passage en colonne sur téléphone est dans le @media (max-width:767px) ci-dessous (M-14). */
+.loc-civnom-row { display: flex; gap: 6px; align-items: center; }
+.loc-civnom-row .loc-civ { width: 72px; flex: 0 0 72px; }
+.loc-civnom-row .loc-nom { flex: 1 1 auto; min-width: 0; }
+
 /* ───────────────────────────────────────────────────────────
    v14.95 MOBILE-AUDIT-ONGLETS Phase 3+4 (Sprint 3H)
    Règles génériques mobile pour finaliser l'audit Phase 1+2 (anti-zoom iOS,
@@ -4980,6 +4987,20 @@ textarea.field-modified-since-sig{
   #ov-bail .m-foot { justify-content: stretch; }
   #ov-bail .m-foot .btn { flex: 1 1 0; min-height: 44px; justify-content: center; }
   #ov-bail .m-foot .btn.bp { flex: 1.4 1 0; }
+
+  /* MOBILE-BAIL (M-16) — le wizard de bail est une PAGE plein écran : plus de marges flottantes ni de
+     pied rogné sous l'écran. L'overlay ne garde aucune gouttière, la modale remplit toute la hauteur
+     disponible (sous le bandeau démo le cas échéant, cf. --demo-h), le corps défile seul et le pied
+     d'action colle en bas. PC/tablette inchangés (tout est dans ce @media téléphone). */
+  #ov-bail { padding: 0 !important; align-items: stretch; }
+  #ov-bail > .modal { width: 100%; max-width: 100%; border: 0; border-radius: 0; display: flex; flex-direction: column; }
+  #ov-bail > .modal > .m-body { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior-y: contain; }
+  #ov-bail > .modal > .m-foot { flex: 0 0 auto; }
+
+  /* MOBILE-BAIL M-14 — civilité + nom empilés : « Mme » et les noms longs en entier (plus de troncature). */
+  .loc-civnom-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .loc-civnom-row .loc-civ { width: 100%; max-width: 160px; flex: none; }
+  .loc-civnom-row .loc-nom { width: 100%; }
 
   /* MOBILE-REFONTE lot 7 (Quittance) : l'aperçu (iframe 72vh en dur) remplit la hauteur
      dispo — sinon bande sombre sous le document. TÉLÉPHONE UNIQUEMENT (≤767) : la
@@ -11395,4 +11416,61 @@ body[data-dash-v4="on"] .v4s-gest2-pill.warn{background:#fef3c7;color:#92400e}
   .irlr-bulk{flex-direction:column;align-items:stretch}
   .irlr-bulk .lead{text-align:center}
   .irlr-bulk .btn{width:100%;min-height:44px}
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   JUSTE-PRIX (tranche 1) — fourchette de loyer HC suggérée (Carte des loyers 2025).
+   Styles scopés .jp-* (aucune collision avec .card/.range/.rows existants). N'utilise
+   que les tokens du design system → mode sombre automatique.
+   ════════════════════════════════════════════════════════════════════════════ */
+.jp-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);overflow:hidden}
+.jp-card-h{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--bor2)}
+.jp-card-h .jp-ico{width:30px;height:30px;border-radius:9px;background:var(--acc-soft);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none}
+.jp-card-h h4{font-weight:800;font-size:14.5px;color:var(--t1);margin:0;letter-spacing:-.01em}
+.jp-card-h .jp-tag{margin-left:auto;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:4px 9px;border-radius:var(--rp);background:var(--grn-bg);color:var(--grn)}
+.jp-card-b{padding:15px 16px}
+.jp-teaser{font-size:13px;color:var(--t2);margin-bottom:12px}
+.jp-range{text-align:center;padding:4px 0}
+.jp-range .jp-lbl{font-size:11.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em}
+.jp-range .jp-val{font-weight:800;color:var(--t1);font-size:34px;letter-spacing:-.03em;margin:4px 0 2px;line-height:1.1}
+.jp-range .jp-val small{font-size:15px;font-weight:700;color:var(--t3)}
+.jp-range .jp-sub{font-size:12.5px;color:var(--t2)}
+.jp-gauge{margin:14px auto 4px;max-width:440px}
+.jp-track{position:relative;height:10px;border-radius:var(--rp);background:linear-gradient(90deg,var(--sur3),var(--acc-soft),var(--sur3))}
+.jp-band{position:absolute;top:0;bottom:0;background:var(--acc);opacity:.5;border-radius:var(--rp)}
+.jp-mid{position:absolute;top:-4px;width:2px;height:18px;background:var(--acc);border-radius:2px}
+.jp-cur{position:absolute;top:-6px;width:12px;height:12px;border-radius:50%;background:var(--sur);border:2px solid var(--grn);transform:translateX(-50%);box-sizing:border-box}
+.jp-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-top:7px;font-weight:600}
+.jp-note{font-size:12px;color:var(--t3);margin-top:6px}
+.jp-rows{display:flex;flex-direction:column;gap:1px;background:var(--bor2);border:1px solid var(--bor2);border-radius:var(--r);overflow:hidden;margin-top:10px}
+.jp-row{display:flex;align-items:center;gap:10px;background:var(--sur);padding:10px 12px;font-size:13px}
+.jp-row .jp-k{color:var(--t2)}
+.jp-row .jp-k b{color:var(--t1)}
+.jp-row .jp-v{margin-left:auto;font-weight:700;color:var(--t1);text-align:right}
+.jp-row .jp-v small{font-weight:600;color:var(--t3);font-size:11px}
+.jp-row.jp-sum{background:var(--sur2)}
+.jp-row.jp-sum .jp-v{color:var(--acc)}
+.jp-details{margin-top:11px;border:1px solid var(--bor);border-radius:var(--r);background:var(--sur2);overflow:hidden}
+.jp-details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:0 13px;min-height:44px;font-size:12.5px;font-weight:700;color:var(--t2)}
+.jp-details>summary::-webkit-details-marker{display:none}
+.jp-details>summary .jp-chev{margin-left:auto;transition:transform .2s;color:var(--t3)}
+.jp-details[open]>summary .jp-chev{transform:rotate(180deg)}
+.jp-details[open]>summary{border-bottom:1px solid var(--bor2)}
+.jp-det-b{padding:13px}
+.jp-det-b p{font-size:12.5px;color:var(--t2);margin:8px 0 0}
+.jp-src{font-size:11.5px;color:var(--t3);display:flex;align-items:flex-start;gap:7px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--bor)}
+.jp-src svg{flex:none;margin-top:1px;color:var(--adv)}
+.jp-alert{display:flex;gap:11px;padding:12px 14px;border-radius:var(--r);font-size:12.5px;align-items:flex-start;margin-top:12px;line-height:1.5}
+.jp-alert.jp-adv{background:var(--adv-bg);color:var(--t2);border:1px solid color-mix(in srgb,var(--adv) 30%,transparent)}
+.jp-alert.jp-ora{background:var(--ora-bg);color:var(--t2);border:1px solid color-mix(in srgb,var(--ora) 32%,transparent)}
+.jp-alert .jp-ai{flex:none}
+.jp-alert.jp-adv .jp-ai{color:var(--adv)}
+.jp-alert.jp-ora .jp-ai{color:var(--ora)}
+.jp-alert b{color:var(--t1)}
+.jp-alert .jp-law{display:block;font-size:11.5px;color:var(--t3);margin-top:4px}
+.jp-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.jp-muted{font-size:12.5px;color:var(--t3)}
+@media (max-width:480px){
+  .jp-range .jp-val{font-size:30px}
+  .jp-acts .btn{width:100%}
 }

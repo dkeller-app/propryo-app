@@ -317,6 +317,11 @@ import {
   computeVetusteLigne, computeVetusteTotal
 } from './core/vetuste-grille.js';
 
+// JUSTE-PRIX (tranche 1) — fourchette de loyer HC suggérée à partir de la Carte des loyers 2025
+// (ANIL/DGALN, data.gouv.fr). Module PUR ; l'app géocode via la BAN et charge le fichier de données
+// à la demande. Exposé sous window.JustePrix.
+import * as JustePrix from './core/juste-prix.js';
+
 // LOG-CANDIDATS (Phase 2) - helpers purs candidature locataire
 import {
   _candidatVersLocataire, _candidatVersGarant,
@@ -856,6 +861,8 @@ window._planApurementStatut = _planApurementStatut;
 window._procedureJudiciaireEtat = _procedureJudiciaireEtat;
 window.DG_STATUS = DG_STATUS;
 window.PROCEDURE_ETAT = PROCEDURE_ETAT;
+// JUSTE-PRIX (tranche 1) — fourchette de loyer HC suggérée (Carte des loyers 2025)
+window.JustePrix = JustePrix;
 
 // LOG-CANDIDATS (Phase 2) - helpers purs candidature locataire
 window.PIECES_REQUISES = PIECES_REQUISES;

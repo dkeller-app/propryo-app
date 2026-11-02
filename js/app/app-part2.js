@@ -17928,7 +17928,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.780 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.782 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }
@@ -20352,7 +20352,291 @@ function _renderLogFichePanelBail(log, bail, ref) {
       </div>` : '';
   // ESPACE LOCATAIRE (0059) : bloc rendu par js/app/espace-locataire-app.js (mode cloud seulement ; vide sinon).
   const elBloc = (typeof window._elBlocHtml === 'function') ? window._elBlocHtml(log, bail || null, ref) : '';   // aussi sans bail : anciens locataires encore en accès
-  return `<div class="logf-panels" style="grid-template-columns:1fr">${currentSection}${elBloc}${bail?_renderAvenantsBail(ref):''}${_renderHistoBailSection(ref)}${_renderLogFichePanelEDL(log, ref)}${notesSection}</div>`;
+  // JUSTE-PRIX (tranche 1) — panneau « fourchette de loyer HC suggérée » : posé dans l'onglet Bail
+  // (porte de la relocation après départ / achat), au MÊME niveau que l'historique → visible bien
+  // occupé (comparaison) comme vacant (relocation). Panneau autonome, lecture seule, lazy-load.
+  const justePrix = (typeof _renderLogFicheJustePrix === 'function') ? _renderLogFicheJustePrix(log, bail, ref) : '';
+  return `<div class="logf-panels" style="grid-template-columns:1fr">${currentSection}${justePrix}${elBloc}${bail?_renderAvenantsBail(ref):''}${_renderHistoBailSection(ref)}${_renderLogFichePanelEDL(log, ref)}${notesSection}</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// JUSTE-PRIX DE MISE EN LOCATION — tranche 1 (fourchette de loyer HC suggérée)
+// ────────────────────────────────────────────────────────────────────────────
+// UI autonome de la fiche logement. Le CALCUL vit dans le module pur js/core/juste-prix.js
+// (window.JustePrix) ; ici on résout les entrées depuis `log`/`bail` (zéro ressaisie), on géocode
+// l'adresse via la BAN déjà utilisée (window.GeorisquesErpDetector) et on charge À LA DEMANDE le
+// fichier de données (js/data/carte-loyers-2025.json) — jamais au chargement initial.
+// Argent = source unique Finances : on LIT le loyer actuel (_finBailHcChAt), on n'écrit rien.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Immeuble parent d'un logement (pour hériter type d'habitat / adresse), ou null. */
+/** L'outil s'applique aux logements d'habitation (la Carte des loyers est « non meublé »). */
+function _jpUsageApplicable(log) {
+  const u = String((log && log.typeUsage) || '');
+  if (!u) return true; // usage non renseigné : on tente (l'utilisateur décide)
+  return /^habitation/.test(u) || u === 'mobilite' || u === 'etudiant';
+}
+
+/** Nombre de pièces principales : le vrai champ log.npp d'abord, puis le bail, puis log.type (texte libre). */
+function _jpNbPieces(log, bail) {
+  if (log && +log.npp) return +log.npp;
+  if (bail && +bail.npp) return +bail.npp;
+  const t = String((log && log.type) || '');
+  if (/studio/i.test(t)) return 1;
+  const m = t.match(/T\s*(\d+)/i);
+  if (m) return +m[1];
+  return null;
+}
+
+/** Classe DPE du logement (via _diagGet si dispo, sinon log.dpe objet/string). */
+function _jpDpeClasse(log) {
+  try { const di = (typeof _diagGet === 'function') ? _diagGet(log, 'dpe') : null; if (di && di.classe) return di.classe; } catch (e) { /* noop */ }
+  if (log && log.dpe && typeof log.dpe === 'object') return log.dpe.classe || '';
+  return (log && typeof log.dpe === 'string') ? log.dpe : '';
+}
+
+/** 'YYYY-MM' d'un mois PLEIN où le bail clos était actif (mois avant la sortie, borné au début). */
+function _jpMoisPleinBailClos(b) {
+  if (!b) return null;
+  const finIso = b.finEffective || (b.depart && b.depart.dateSortie) || b.fin;
+  const start = (b.debut && /^\d{4}-\d{2}/.test(b.debut)) ? String(b.debut).slice(0, 7) : null;
+  let ym = null;
+  if (finIso && /^\d{4}-\d{2}/.test(String(finIso))) {
+    const dt = new Date(String(finIso).slice(0, 10) + 'T00:00:00');
+    if (!Number.isNaN(dt.getTime())) { dt.setMonth(dt.getMonth() - 1); ym = dt.toISOString().slice(0, 7); } // mois avant la sortie → évite le prorata
+  }
+  if (!ym || (start && ym < start)) ym = start;
+  return ym;
+}
+
+/** Dernier loyer HC appliqué sur le lot (Finances = source unique). Occupé : mois courant ;
+ *  vacant/relocation : mois plein du bail clos. On plancher par le HC initial pour ne JAMAIS
+ *  sous-estimer le plafond de gel DPE F/G (le prorata de fin ou un HC nul ne doit pas mordre). */
+function _jpDernierLoyerHC(log, bail, ref) {
+  const lire = (ym) => { try { if (ym && typeof _finBailHcChAt === 'function') { const d = _finBailHcChAt(ref, ym); return +((d && d.hc)) || 0; } } catch (e) { /* noop */ } return 0; };
+  let hc = lire(new Date().toISOString().slice(0, 7)); // occupé : dû du mois courant (révisions incluses)
+  const b = DB.baux && DB.baux[ref];
+  if (!hc && b) hc = lire(_jpMoisPleinBailClos(b)); // vacant : dernier mois plein du bail clos
+  // Plancher : HC initial du bail clos / actif / log — jamais sous le dernier loyer réellement appliqué.
+  return Math.max(hc, (b && +b.hc) || 0, (bail && +bail.hc) || 0, (+(log && log.hc)) || 0);
+}
+
+/** Construit l'objet d'entrée PUR pour window.JustePrix.evaluer (aucune ressaisie). */
+function _jpBuildInput(log, bail, ref) {
+  const imm = _finImmDuLot(log);   // résolveur officiel : filtre les immeubles supprimés
+  const th = String((log && log.typeHabitat) || (imm && imm.typeHabitat) || '');
+  const maison = /maison/i.test(th) || /maison/i.test(String((log && log.type) || ''));
+  // Adresse : résolveur officiel de l'app (immeuble autoritatif post-migration), repli log.adr legacy.
+  let address = '';
+  try { if (window.LogImmResolver && typeof window.LogImmResolver.resolveAddressForLog === 'function') address = (window.LogImmResolver.resolveAddressForLog(log, imm) || {}).full || ''; } catch (e) { /* noop */ }
+  if (!address) address = (log && log.adr) || '';
+  return {
+    surf: +((log && log.surf)) || 0,
+    maison,
+    nbPieces: _jpNbPieces(log, bail),
+    chauffageColl: !!(log && log.chauffage && log.chauffage.coll),
+    ecsColl: !!(log && log.ecs && log.ecs.coll),
+    copro: !maison,
+    dpeClasse: _jpDpeClasse(log),
+    usageApplicable: _jpUsageApplicable(log),
+    meuble: /meuble/i.test(String((log && log.typeUsage) || '')),
+    loyerActuelHC: _jpDernierLoyerHC(log, bail, ref),
+    address
+  };
+}
+
+// Cache mémoire du fichier de données (chargé une seule fois, puis servi par le SW hors ligne).
+let _jpCarteData = null, _jpCartePromise = null;
+function _jpLoadCarteLoyers() {
+  if (_jpCarteData) return Promise.resolve(_jpCarteData);
+  if (_jpCartePromise) return _jpCartePromise;
+  _jpCartePromise = fetch('js/data/carte-loyers-2025.json', { headers: { 'Accept': 'application/json' } })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => { _jpCarteData = d; return d; })
+    .catch(e => { _jpCartePromise = null; throw e; });
+  return _jpCartePromise;
+}
+
+/** Géocode une adresse via la BAN (réutilise GeorisquesErpDetector + _erpFetchJson retry/backoff) → {insee, city, score, …} ou null. */
+function _jpGeocodeInsee(address) {
+  const G = window.GeorisquesErpDetector;
+  if (!G || !address) return Promise.resolve(null);
+  const fetchJson = (typeof _erpFetchJson === 'function')
+    ? _erpFetchJson(G.banUrl(address))
+    : fetch(G.banUrl(address), { headers: { 'Accept': 'application/json' } }).then(r => { if (!r.ok) throw new Error('BAN HTTP ' + r.status); return r.json(); });
+  return fetchJson.then(j => G.parseBan(j));
+}
+
+/** Géocodage fiable : adresse rattachée à une commune avec un score BAN suffisant (≥ 0,5). */
+function _jpGeoFiable(ban) {
+  return !!(ban && ban.insee && (typeof ban.score !== 'number' || ban.score >= 0.5));
+}
+
+// Petites icônes SVG (ligne) propres au panneau, fidèles à la maquette validée.
+const _JP_SVG = {
+  euro: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+  info: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+  chev: '<svg class="jp-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
+  book: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-8 5"/><path d="M3 3v5h5"/></svg>'
+};
+
+/** Panneau « Juste prix » (teaser + bouton d'estimation à la demande). */
+function _renderLogFicheJustePrix(log, bail, ref) {
+  const refSafe = _lyQ(ref);
+  const input = _jpBuildInput(log, bail, ref);
+  let blocked = '';
+  if (!input.usageApplicable) blocked = 'Cet outil concerne les logements d\'habitation (référence non meublé) : il ne s\'applique pas aux garages, locaux ou autres usages.';
+  else if (!(input.surf > 0)) blocked = 'Renseigner la surface habitable du bien pour estimer un loyer de marché.';
+  else if (!input.address) blocked = 'Renseigner l\'adresse du bien pour situer la commune et estimer un loyer de marché.';
+  const body = blocked
+    ? `<div class="jp-muted">${escHtml(blocked)}</div>`
+    : `<div class="jp-teaser">Estimer une fourchette de loyer <b>hors charges</b> à partir des caractéristiques du bien et de la Carte des loyers 2025 (données publiques). Une suggestion à ajuster — l'utilisateur décide du loyer.</div>
+       <div class="jp-acts"><button class="btn bp" type="button" onclick="_jpEstimer('${refSafe}')">${_JP_SVG.euro} Estimer le juste prix</button></div>`;
+  return `
+    <div class="logf-panel" style="grid-column:1/-1">
+      <div class="jp-card">
+        <div class="jp-card-h">
+          <span class="jp-ico">${_JP_SVG.euro}</span>
+          <h4>Juste prix de mise en location</h4>
+          <span class="jp-tag">Données publiques</span>
+        </div>
+        <div class="jp-card-b" id="jp-body">${body}</div>
+      </div>
+    </div>`;
+}
+
+function _jpRetryBtn(ref) {
+  return `<div class="jp-acts"><button class="btn bs" type="button" onclick="_jpEstimer('${_lyQ(ref)}')">${_JP_SVG.refresh} Réessayer</button></div>`;
+}
+
+/** Lance l'estimation (lazy-load données + géocodage BAN), puis rend le résultat en place. */
+async function _jpEstimer(ref) {
+  const body = el('jp-body'); if (!body) return;
+  const log = (DB.logements || []).find(l => l.ref === ref); if (!log) return;
+  const bail = _bienActiveBail(ref);
+  const input = _jpBuildInput(log, bail, ref);
+  body.innerHTML = `<div class="jp-muted">Estimation en cours… (lecture des données publiques)</div>`;
+  try {
+    const [data, ban] = await Promise.all([_jpLoadCarteLoyers(), _jpGeocodeInsee(input.address)]);
+    // Score BAN insuffisant → on ne rattache PAS à une commune incertaine (éviter un chiffre faux en silence).
+    if (!_jpGeoFiable(ban)) {
+      body.innerHTML = `<div class="jp-muted">Adresse non localisée avec certitude : le bien ne peut pas être rattaché à une commune fiable. Préciser l'adresse du bien pour obtenir une estimation.</div>${_jpRetryBtn(ref)}`;
+      return;
+    }
+    const rec = (data.communes || {})[ban.insee] || null;
+    input.insee = ban.insee;
+    input.commune = ban.city || (rec && rec.n) || '';
+    const res = window.JustePrix.evaluer(input, rec, { meta: data.meta, dateRef: new Date().toISOString().slice(0, 10) });
+    body.innerHTML = _jpRenderResult(res, { ban, ref, meuble: input.meuble });
+  } catch (e) {
+    console.warn('[juste-prix]', e);
+    body.innerHTML = `<div class="jp-muted">Estimation indisponible pour le moment (données ou localisation inaccessibles). Réessayer plus tard.</div>${_jpRetryBtn(ref)}`;
+  }
+}
+
+/** Rend le résultat (fourchette + provision + alerte DPE) dans le corps du panneau. */
+function _jpRenderResult(res, ctx) {
+  ctx = ctx || {};
+  if (!res || !res.applicable) {
+    const raisons = {
+      'commune-absente': 'Aucune donnée de loyer pour cette commune dans la Carte des loyers 2025.',
+      'surface-absente': 'Surface habitable manquante : renseigner la surface du bien.',
+      'usage-non-applicable': 'Outil réservé aux logements d\'habitation.',
+      'segment-absent': 'Aucun indicateur disponible pour ce type de bien sur la commune.'
+    };
+    const msg = raisons[res && res.raison] || 'Estimation non disponible pour ce bien.';
+    const communeHint = (ctx.ban && ctx.ban.city) ? ` (${escHtml(ctx.ban.city)}${ctx.ban.insee ? ' — ' + escHtml(ctx.ban.insee) : ''})` : '';
+    return `<div class="jp-muted">${escHtml(msg)}${communeHint}</div>${ctx.ref ? _jpRetryBtn(ctx.ref) : ''}`;
+  }
+  const f = res.fourchette;
+  const commune = escHtml(res.commune || '');
+  const segLbl = escHtml(res.segmentLabel || '');
+  // ── Jauge : fourchette + marqueur central + marqueur du loyer actuel (lu Finances)
+  const span = Math.max(1, f.haute - f.basse);
+  const gmin = f.basse - span * 0.45, gmax = f.haute + span * 0.45, gr = Math.max(1, gmax - gmin);
+  const pos = x => Math.max(0, Math.min(100, (x - gmin) / gr * 100));
+  const curHtml = res.comparaison
+    ? `<span class="jp-cur" style="left:${pos(res.comparaison.loyerActuelHC).toFixed(1)}%" title="Loyer actuel : ${res.comparaison.loyerActuelHC} € HC"></span>` : '';
+  // ── Comparaison au loyer actuel
+  let compHtml = '';
+  if (res.comparaison) {
+    const posMap = { 'sous': ['sous la fourchette', 'var(--adv)'], 'dans': ['dans la cible', 'var(--grn)'], 'au-dessus': ['au-dessus de la fourchette', 'var(--ora)'] };
+    const pm = posMap[res.comparaison.position] || ['', 'var(--t2)'];
+    compHtml = `
+      <div class="jp-rows">
+        <div class="jp-row"><span class="jp-k">Dernier loyer appliqué sur ce bien</span><span class="jp-v">${fmt(res.comparaison.loyerActuelHC)}<small> HC</small></span></div>
+        <div class="jp-row"><span class="jp-k">Position dans la fourchette</span><span class="jp-v" style="color:${pm[1]}">${escHtml(pm[0])}</span></div>
+      </div>
+      <p class="jp-note" style="text-align:left">Le loyer actuel est lu dans Finances (source unique). Aucune donnée saisie deux fois.</p>`;
+  }
+  // ── Alerte DPE (jamais rouge : information ou avertissement)
+  let dpeHtml = '';
+  if (res.dpe.gelFG || res.dpe.interdit) {
+    dpeHtml = `<div class="jp-alert jp-ora"><span class="jp-ai">${_JP_SVG.info}</span><div>${res.dpe.mentions.map(m => escHtml(m)).join('<span class="jp-law"></span>')}</div></div>`;
+  } else if (res.dpe.classe) {
+    dpeHtml = `<div class="jp-alert jp-adv"><span class="jp-ai">${_JP_SVG.info}</span><div><b>DPE ${escHtml(res.dpe.classe)} — aucun blocage de loyer.</b> La révision et la réévaluation du loyer restent possibles.<span class="jp-law">Rappel : un logement classé F ou G a son loyer gelé (loi Climat et Résilience, 24/08/2022) ; location interdite G depuis le 01/01/2025, F au 01/01/2028.</span></div></div>`;
+  } else {
+    dpeHtml = `<div class="jp-alert jp-adv"><span class="jp-ai">${_JP_SVG.info}</span><div>DPE non renseigné : la contrainte de gel (F/G) et le calendrier d'interdiction ne peuvent pas être vérifiés. Renseigner le DPE du bien pour une suggestion complète.</div></div>`;
+  }
+  // ── Provision : détails
+  const prov = res.provision || { montant: 0, details: [] };
+  const provRows = (prov.details || []).map(d =>
+    `<div class="jp-row"><span class="jp-k">${escHtml(d.k)}</span><span class="jp-v">${(+d.m2).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €/m²</span></div>`).join('')
+    || `<div class="jp-row"><span class="jp-k">Aucune charge récupérable estimée</span><span class="jp-v">—</span></div>`;
+  const srcAttr = (res.meta && res.meta.attribution) || 'Estimations ANIL, à partir des données du Groupe SeLoger et de leboncoin';
+
+  return `
+    <div class="jp-range">
+      <div class="jp-lbl">Fourchette conseillée</div>
+      <div class="jp-val">${fmtN(f.basse)}&nbsp;–&nbsp;${fmtN(f.haute)}&nbsp;<small>€ HC / mois</small></div>
+      <div class="jp-sub">Milieu de fourchette : <b>${fmt(res.hcCentral)}</b>${res.euroM2HC ? ' · soit ≈ ' + (+res.euroM2HC).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' €/m² hors charges' : ''}</div>
+    </div>
+    <div class="jp-gauge">
+      <div class="jp-track"><span class="jp-band" style="left:${pos(f.basse).toFixed(1)}%;right:${(100 - pos(f.haute)).toFixed(1)}%"></span><span class="jp-mid" style="left:${pos(res.hcCentral).toFixed(1)}%"></span>${curHtml}</div>
+      <div class="jp-scale"><span>${fmt(f.basse)}</span><span>${fmt(res.hcCentral)}</span><span>${fmt(f.haute)}</span></div>
+    </div>
+    <p class="jp-note">Repère issu d'annonces du secteur. À ajuster selon l'état réel du bien et la saison.</p>
+    ${ctx.meuble ? `<p class="jp-note" style="text-align:left">Estimation basée sur le <b>non-meublé</b> (nature de la Carte des loyers) : un logement meublé se loue en général un peu plus cher.</p>` : ''}
+
+    <details class="jp-details">
+      <summary>${_JP_SVG.info} Voir le détail du calcul ${_JP_SVG.chev}</summary>
+      <div class="jp-det-b">
+        <div class="jp-rows">
+          <div class="jp-row"><span class="jp-k">Carte des loyers — ${commune}${commune ? ', ' : ''}${segLbl}</span><span class="jp-v">${(+res.euroM2CC).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} €/m²<small> charges comprises</small></span></div>
+          <div class="jp-row"><span class="jp-k">× surface habitable</span><span class="jp-v">${fmt(res.loyerCC)}<small> CC</small></span></div>
+          <div class="jp-row"><span class="jp-k">− provision de charges estimée</span><span class="jp-v">− ${fmt(prov.montant)}</span></div>
+          <div class="jp-row jp-sum"><span class="jp-k"><b>Loyer hors charges de référence</b></span><span class="jp-v">≈ ${fmt(res.hcCentral)}</span></div>
+          <div class="jp-row"><span class="jp-k">Fourchette (fiabilité de la commune : ${escHtml(res.fiabilite.label)})</span><span class="jp-v">${fmt(f.basse)} – ${fmt(f.haute)}</span></div>
+        </div>
+        <p>La Carte des loyers donne un loyer <b>charges comprises</b>. Pour obtenir un loyer <b>hors charges</b>, la provision estimée est retranchée. La largeur de la fourchette (± ${Math.round(f.width * 100)} %) reflète la fiabilité de la donnée sur la commune (prédiction au niveau ${escHtml(res.fiabilite.typLabel)}).</p>
+        <div class="jp-src">${_JP_SVG.book}<span>Source : « Carte des loyers » 2025 — ${escHtml(srcAttr)} (data.gouv.fr, Licence Ouverte v2). Caractéristiques lues dans la fiche du bien (surface, type, commune).</span></div>
+      </div>
+    </details>
+
+    ${compHtml}
+    ${dpeHtml}
+
+    <div class="jp-range" style="padding-top:14px;margin-top:4px;border-top:1px solid var(--bor2)">
+      <div class="jp-lbl">Provision de charges proposée</div>
+      <div class="jp-val" style="font-size:26px">≈ ${fmtN(prov.montant)}&nbsp;<small>€ / mois</small></div>
+      <div class="jp-sub">Estimation prudente, régularisée une fois par an sur charges réelles.</div>
+    </div>
+    <details class="jp-details">
+      <summary>${_JP_SVG.info} D'où vient cette provision ${_JP_SVG.chev}</summary>
+      <div class="jp-det-b">
+        <div class="jp-rows">
+          <div class="jp-row"><span class="jp-k">Chauffage</span><span class="jp-v">${res.provision && res.provision.details.some(d => /^Chauffage collectif/.test(d.k)) ? 'collectif<small> → inclus</small>' : 'individuel<small> → hors provision</small>'}</span></div>
+          ${provRows}
+          <div class="jp-row jp-sum"><span class="jp-k"><b>Provision mensuelle estimée</b></span><span class="jp-v">≈ ${fmt(prov.montant)}</span></div>
+        </div>
+        <p>La provision couvre les charges <b>récupérables</b> (parties communes, et le cas échéant chauffage / eau chaude collectifs). C'est une <b>estimation</b>, régularisée chaque année sur les charges réelles — elle n'est pas calculée par Finances.</p>
+        <div class="jp-src">${_JP_SVG.book}<span>Charges récupérables : décret n° 87-713. Type de chauffage et d'eau chaude lus dans la fiche du bien.</span></div>
+      </div>
+    </details>
+
+    <p class="jp-note" style="text-align:left;margin-top:12px">Suggestion, jamais un verdict — l'utilisateur décide du loyer et des charges. Aucun montant n'est enregistré automatiquement.</p>`;
 }
 
 // HISTORIQUE-BAIL-ONGLET (17/07) : _renderBailTimeline (timeline horizontale) et

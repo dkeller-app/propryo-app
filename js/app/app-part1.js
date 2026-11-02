@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.780';
+const IMMOTRACK_VERSION = '15.782';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -17834,13 +17834,16 @@ function renderBailLocs(locs) {
       <div class="flex-b mb8"><b style="font-size:12px">Locataire ${i+1}</b>${i>0?`<button class="btn br bb" onclick="removeLocataire(${i})">✕</button>`:''}</div>
       <div class="fg2">
         <div class="fg"><label>Civilité &amp; Nom complet *</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select class="inp loc-civ" data-i="${i}" style="width:72px;flex-shrink:0">
+          <!-- MOBILE-BAIL M-14 : sur téléphone, civilité + nom s'empilent (select pleine largeur : « Mme »
+               affiché en entier, plus de « Mm » rogné ; nom sur sa ligne, jamais coupé). PC/tablette : rangée
+               inchangée (select 72 px + nom en flex, cf. .loc-civnom-row dans css/main.css). -->
+          <div class="loc-civnom-row">
+            <select class="inp loc-civ" data-i="${i}">
               <option value="" ${!l.civilite?'selected':''}>–</option>
               <option value="M." ${l.civilite==='M.'?'selected':''}>M.</option>
               <option value="Mme" ${l.civilite==='Mme'?'selected':''}>Mme</option>
             </select>
-            <input class="inp loc-nom" data-i="${i}" value="${escHtml(l.nom||'')}" placeholder="Nom Prénom" style="flex:1">
+            <input class="inp loc-nom" data-i="${i}" value="${escHtml(l.nom||'')}" placeholder="Nom Prénom">
           </div>
         </div>
         <div class="fg"><label>Date de naissance</label><input class="inp loc-ddn" data-i="${i}" type="date" value="${l.ddn||''}"></div>
@@ -22957,6 +22960,25 @@ function _avenantLoyerFeedback(){ var fb=document.getElementById('av-loyer-fb');
   }).join('');
 }
 function _avenantToggle(k){ _avenantState.sel[k]=!_avenantState.sel[k]; _avenantBuildGrid(); _avenantBuildGroups(); _avenantRender(); }
+// MOBILE-BAIL (M-16) — onglets « Objets / Aperçu » de l'avenant sur téléphone (le CSS n'affiche qu'un panneau
+// à la fois ; sur PC/tablette la grille reste côte à côte). Au passage sur « Aperçu », on re-rend le document :
+// le cadre sandboxé se mesure au chargement et resterait tronqué s'il avait été rendu masqué (cf. DOC-3).
+function _avenantPhoneTab(t){
+  var body=document.querySelector('#ov-avenant .av-body'); if(!body) return;
+  body.setAttribute('data-phtab', t);
+  document.querySelectorAll('#ov-avenant .av-seg button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-pht')===t); });
+  if(t==='apercu') _avenantRender();
+}
+// Menu « Plus » de l'en-tête (téléphone) : brouillon + PDF, hors du pied (un seul primaire au pied, M-4).
+// Line-icons (M-9 : plus d'emoji 📤/⬇️). Réutilise le popover de menu contextuel commun (_openMenuPopover).
+function _avenantPlusMenu(evt){
+  var ref=(el('ov-avenant-ref')||{}).value||_avenantState.ref; var rq=_lyQ(ref);
+  var partage=(typeof _edlPrefersShare==='function'&&_edlPrefersShare());
+  var html=''+
+    '<button class="bmp-item" role="menuitem" onclick="_closeBienMenus();_avenantSave(\''+rq+'\',{brouillon:true})">'+_uiIcon('save')+'Enregistrer en brouillon</button>'+
+    '<button class="bmp-item" role="menuitem" onclick="_closeBienMenus();_avenantSortiePdf()">'+_uiIcon(partage?'share':'download')+(partage?'Partager le PDF':'Télécharger le PDF')+'</button>';
+  if(typeof _openMenuPopover==='function') _openMenuPopover(evt, html);
+}
 // Habille le corps de l'avenant avec la trame Propryo (_docPage : bandeau logos + titre + pied).
 function _avenantDocPageHtml(ref){
   var bail=DB.baux&&DB.baux[ref]; if(!bail) return '';
@@ -23014,11 +23036,47 @@ function _avenantOpen(ref, opts){
    /* DOC-3 : les règles du DOCUMENT sont parties dans `_avenantFrameCss()` — scopées par
       `#ov-avenant`, elles ne pouvaient plus l'atteindre une fois le document dans son cadre. */
    '#ov-avenant .av-foot{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--bor);background:var(--sur2)}'+
+   // Segmented control « Objets / Aperçu » et bouton « Plus » : TÉLÉPHONE uniquement (cachés ailleurs).
+   '#ov-avenant .av-seg{display:none}'+
+   '#ov-avenant .av-plus{display:none}'+
+   // MOBILE-BAIL (M-16/M-3/M-4) — l'avenant devient une PAGE plein écran sur téléphone : plus de modale
+   // flottante ni de pied rogné ; l'aperçu passe dans un onglet (plus de deux feuilles empilées, A2) ;
+   // objets sur une seule colonne (A5) ; pied à un seul primaire, brouillon + PDF dans le menu « Plus »
+   // de l'en-tête (A3/A4). PC/tablette inchangés : tout est dans ce @media.
+   '@media(max-width:767px){'+
+     '#ov-avenant{padding:0 !important;align-items:stretch}'+
+     '#ov-avenant .av-wrap{width:100%;max-width:100%;max-height:none;height:100%;border-radius:0;border:0}'+
+     '#ov-avenant .av-body{display:flex;flex-direction:column;min-height:0}'+
+     '#ov-avenant .av-objgrid{grid-template-columns:1fr}'+
+     '#ov-avenant .av-form{border-right:0;flex:1 1 auto;min-height:0}'+
+     '#ov-avenant .av-prevwrap{flex:1 1 auto;min-height:0}'+
+     '#ov-avenant .av-body[data-phtab="objets"] .av-prevwrap{display:none}'+
+     '#ov-avenant .av-body[data-phtab="apercu"] .av-form{display:none}'+
+     '#ov-avenant .av-seg{display:flex;gap:4px;margin:10px 12px 0;padding:4px;background:var(--sur2);border:1px solid var(--bor);border-radius:999px}'+
+     '#ov-avenant .av-seg button{flex:1;appearance:none;border:0;background:transparent;min-height:42px;border-radius:999px;font:700 14px Inter;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}'+
+     '#ov-avenant .av-seg button.on{background:var(--sur);color:var(--t1);box-shadow:var(--shadow)}'+
+     '#ov-avenant .av-seg button svg{width:16px;height:16px}'+
+     '#ov-avenant .av-plus{display:inline-flex}'+
+     '#ov-avenant .av-foot{flex-wrap:nowrap}'+
+     '#ov-avenant .av-foot .av-foot-sec{display:none}'+
+     '#ov-avenant .av-foot .btn.bp{flex:1 1 auto;min-height:48px;justify-content:center}'+
+   '}'+
    _docCss()+
    '</style>'+
    '<div class="av-wrap" onclick="event.stopPropagation()">'+
-   '<div class="m-head"><div><h3 style="margin:0;font:800 15px Inter">'+(_brouillon?'Brouillon — avenant n° ':'Créer un avenant — n° ')+_avenantState.no+'</h3><div style="font-size:12px;color:var(--t3);font-weight:600">'+who+'</div></div><button class="m-close" onclick="closeM(\'ov-avenant\')">✕</button></div>'+
-   '<div class="av-body">'+
+   '<div class="m-head"><div><h3 style="margin:0;font:800 15px Inter">'+(_brouillon?'Brouillon — avenant n° ':'Créer un avenant — n° ')+_avenantState.no+'</h3><div style="font-size:12px;color:var(--t3);font-weight:600">'+who+'</div></div>'+
+     // Menu « Plus » (téléphone) : brouillon + PDF y sont rangés pour garder un seul primaire au pied (M-4).
+     '<div style="display:flex;align-items:center;gap:6px;flex:0 0 auto">'+
+       '<button type="button" class="btn bs av-plus" onclick="_avenantPlusMenu(event)" aria-haspopup="menu">'+_uiIcon('dots')+'Plus</button>'+
+       '<button class="m-close" onclick="closeM(\'ov-avenant\')">✕</button>'+
+     '</div></div>'+
+     // Onglets (téléphone) : séparent la liste à cocher (« Objets ») de l'aperçu du document (« Aperçu »),
+     // au lieu des deux feuilles empilées (A2). L'aperçu sandboxé se re-rend au passage sur l'onglet (DOC-3).
+     '<div class="av-seg" role="tablist">'+
+       '<button type="button" role="tab" data-pht="objets" class="on" onclick="_avenantPhoneTab(\'objets\')">'+_uiIcon('edit')+'Objets</button>'+
+       '<button type="button" role="tab" data-pht="apercu" onclick="_avenantPhoneTab(\'apercu\')">'+_uiIcon('doc-text')+'Aperçu</button>'+
+     '</div>'+
+   '<div class="av-body" data-phtab="objets">'+
      '<div class="av-form">'+
        '<div class="av-objgrid" id="av-objgrid"></div>'+
        '<div id="av-groups"></div>'+
@@ -23031,10 +23089,12 @@ function _avenantOpen(ref, opts){
      '<div class="av-prevwrap"><div id="av-preview"></div></div>'+
    '</div>'+
    '<input type="hidden" id="ov-avenant-ref" value="'+escHtml(ref)+'">'+
+   // Pied : UN seul primaire « Enregistrer l'avenant » (M-4). Sur téléphone, brouillon / PDF / Fermer sont
+   // masqués ici (.av-foot-sec) et accessibles via le menu « Plus » de l'en-tête et le ✕ (décision avenant 1).
    '<div class="av-foot"><button class="btn bp" onclick="_avenantSave(\''+ _lyQ(ref) +'\')">Enregistrer l\'avenant</button>'+
-     '<button class="btn bs" onclick="_avenantSave(\''+ _lyQ(ref) +'\',{brouillon:true})">Enregistrer en brouillon</button>'+
-     '<button class="btn bs bb" onclick="_avenantSortiePdf()">'+((typeof _edlPrefersShare==='function'&&_edlPrefersShare())?'📤 Partager le PDF':'⬇️ Télécharger le PDF')+'</button>'+
-     '<button class="btn bs" onclick="closeM(\'ov-avenant\')">Fermer</button></div>'+
+     '<button class="btn bs av-foot-sec" onclick="_avenantSave(\''+ _lyQ(ref) +'\',{brouillon:true})">Enregistrer en brouillon</button>'+
+     '<button class="btn bs bb av-foot-sec" onclick="_avenantSortiePdf()">'+((typeof _edlPrefersShare==='function'&&_edlPrefersShare())?'📤 Partager le PDF':'⬇️ Télécharger le PDF')+'</button>'+
+     '<button class="btn bs av-foot-sec" onclick="closeM(\'ov-avenant\')">Fermer</button></div>'+
    '</div>';
   _avenantBuildGrid(); _avenantBuildGroups();
   if(_brouillon) _avenantRestaurer(_brouillon);

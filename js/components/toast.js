@@ -128,6 +128,80 @@ export function placerToast(t, doc = globalThis.document, win = globalThis.windo
   } catch (_e) { return null; }
 }
 
+// ── MOBILE-BAIL lot 2 (M-3) — le toast ne recouvre JAMAIS le CTA d'une page plein écran ───────────
+// Décision arbitrée : quand une page plein écran est ouverte sur téléphone/tablette (bail, avenant, EDL… =
+// une couche détectée par mesurerEcran), le toast est MASQUÉ tant qu'elle est affichée, puis RE-PRÉSENTÉ à
+// sa fermeture s'il n'a pas encore expiré. Le toast reste TRANSITOIRE (minuterie d'auto-disparition inchangée,
+// window._toastTmr qui court jusqu'à `finAt`) : rien de « non lu » / persistant n'est introduit ici.
+let _toastEtat = null;         // { msg, type, extraHTML, finAt } ou null (rien à l'écran)
+let _toastSuspendu = false;    // masqué parce qu'une page plein écran est ouverte
+let _toastObs = null;          // MutationObserver actif seulement pendant la vie d'un toast
+
+/** Pose le contenu du toast dans #toast et le place (sans toucher à la minuterie). */
+function _afficherToast(t) {
+  if (!_toastEtat) return;
+  t.innerHTML = escHtml(_toastEtat.msg) + (_toastEtat.extraHTML || '');
+  t.style.display = 'flex';
+  t.style.alignItems = 'center';
+  t.style.gap = '6px';
+  t.style.color =
+    _toastEtat.type === 'err' ? 'var(--red)' :
+    _toastEtat.type === 'ok'  ? 'var(--grn)' :
+    _toastEtat.type === 'warn' ? 'var(--ora)' : 'var(--t1)';
+  placerToast(t);
+}
+
+/** Fin de vie du toast : on le cache et on oublie l'état + l'observateur. */
+function _expireToast() {
+  _toastEtat = null; _toastSuspendu = false;
+  _arreterObsCouches();
+  try { const t = document.getElementById('toast'); if (t) t.style.display = 'none'; } catch (_e) {}
+}
+
+/**
+ * Réconcilie l'affichage du toast avec l'état de l'écran : masqué sous une page plein écran,
+ * re-présenté à sa fermeture tant qu'il reste du temps. Ne lève jamais (DOM mocké en test).
+ */
+export function reconcilierToast() {
+  try {
+    const t = document.getElementById('toast');
+    if (!t || !_toastEtat) return;
+    if (Date.now() >= _toastEtat.finAt) { _expireToast(); return; }   // déjà expiré pendant qu'il était masqué
+    const m = mesurerEcran();
+    const pagePleine = (m.telephone || m.tablette) && !!m.couche;
+    if (pagePleine) {
+      if (t.style.display !== 'none') t.style.display = 'none';
+      _toastSuspendu = true;
+    } else if (_toastSuspendu) {
+      _toastSuspendu = false;
+      _afficherToast(t);                                              // le temps restant est porté par _toastTmr
+    }
+  } catch (_e) { /* environnement sans DOM complet : on ne fait rien */ }
+}
+
+// Observateur léger, actif UNIQUEMENT pendant la vie d'un toast (coût borné à quelques secondes) : il
+// réévalue le placement quand une couche s'ouvre/se ferme (changement de classe `hidden`, ajout/retrait).
+let _reconcilPlanifie = false;
+function _planifierReconcile() {
+  if (_reconcilPlanifie) return; _reconcilPlanifie = true;
+  // setTimeout (pas requestAnimationFrame) : rAF est GELÉ quand l'onglet passe en arrière-plan, or une
+  // page plein écran peut se fermer à ce moment-là — le toast ne reviendrait jamais. La boucle se tarit
+  // d'elle-même : reconcilierToast n'écrit dans le DOM que lorsqu'il change d'état (sinon, no-op).
+  setTimeout(() => { _reconcilPlanifie = false; reconcilierToast(); }, 0);
+}
+function _demarrerObsCouches() {
+  if (_toastObs || typeof MutationObserver !== 'function') return;
+  try {
+    const cible = globalThis.document && globalThis.document.body;
+    if (!cible) return;
+    _toastObs = new MutationObserver(_planifierReconcile);
+    _toastObs.observe(cible, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  } catch (_e) { _toastObs = null; }
+}
+function _arreterObsCouches() {
+  if (_toastObs) { try { _toastObs.disconnect(); } catch (_e) {} _toastObs = null; }
+}
+
 /**
  * @param {string} msg - Le message principal (sera échappé HTML)
  * @param {''|'err'|'ok'|'warn'} type - Type d'icone/couleur
@@ -137,15 +211,11 @@ export function placerToast(t, doc = globalThis.document, win = globalThis.windo
 export function showToast(msg, type = '', dur = 2800, extraHTML = '') {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.innerHTML = escHtml(msg) + (extraHTML || '');
-  t.style.display = 'flex';
-  t.style.alignItems = 'center';
-  t.style.gap = '6px';
-  t.style.color =
-    type === 'err' ? 'var(--red)' :
-    type === 'ok'  ? 'var(--grn)' :
-    type === 'warn' ? 'var(--ora)' : 'var(--t1)';
-  placerToast(t);
+  _toastEtat = { msg, type, extraHTML: extraHTML || '', finAt: Date.now() + dur };
+  _toastSuspendu = false;
+  _afficherToast(t);
   clearTimeout(window._toastTmr);
-  window._toastTmr = setTimeout(() => t.style.display = 'none', dur);
+  window._toastTmr = setTimeout(_expireToast, dur);
+  _demarrerObsCouches();
+  reconcilierToast();            // masque aussitôt si une page plein écran est déjà ouverte
 }
