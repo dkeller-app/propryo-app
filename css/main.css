@@ -11311,3 +11311,88 @@ body[data-dash-v4="on"] .v4s-gest2-pill.warn{background:#fef3c7;color:#92400e}
 /* CONSO-IA — sous-titre des couches, cartes de compte au téléphone (geste réel 16/10). */
 .cia-modal .m-head h3 small{display:block;font-size:12px;font-weight:500;color:var(--t3);margin-top:2px}
 .cia-ac .l1,.cia-ac .l2{flex-direction:row;flex-wrap:nowrap}.cia-ac .l2 .fp{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ════ IRL-RATTRAPAGE (v15.778) — écran de rattrapage des révisions IRL + entrée « À regarder » ════ */
+/* Entrée (bandeau Agenda / tuile À regarder) */
+.irlr-ban{margin:0 0 12px}
+.irlr-entry{display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:var(--warn-soft);
+  border:1px solid color-mix(in srgb,var(--warn) 28%,transparent);border-radius:var(--rl);padding:12px 14px;cursor:pointer;font:inherit;color:inherit;min-height:44px}
+.irlr-entry .ic{width:38px;height:38px;border-radius:11px;background:var(--sur);border:1px solid var(--bor);display:grid;place-items:center;flex:0 0 auto;color:var(--warn)}
+.irlr-entry .ic svg{width:19px;height:19px}
+.irlr-entry .m{flex:1;min-width:0}
+.irlr-entry .m .t{display:block;font-weight:700;font-size:14px;color:var(--t1)}
+.irlr-entry .m .s{display:block;font-size:12.5px;color:var(--t2);margin-top:1px;overflow-wrap:anywhere}
+.irlr-entry .cnt{min-width:24px;height:24px;padding:0 9px;border-radius:var(--rp);background:var(--warn);color:var(--cta-text);font-weight:800;font-size:12px;display:grid;place-items:center;flex:0 0 auto}
+.irlr-entry > svg{width:16px;height:16px;color:var(--t3);flex:0 0 auto}
+
+/* Fenêtre */
+.modal.irlr{max-width:920px}
+.irlr .m-head h3 small{display:block;font-size:12px;font-weight:500;color:var(--t3);margin-top:2px}
+.irlr-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.irlr-sum .k{background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rl);padding:11px 13px}
+.irlr-sum .k .lbl{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--t3)}
+.irlr-sum .k .v{font-family:var(--ff-display,'Schibsted Grotesk',sans-serif);font-weight:800;font-size:22px;margin-top:3px;color:var(--t1)}
+.irlr-sum .k .v.pos{color:var(--pos)}
+.irlr-sum .k .s{font-size:11.5px;color:var(--t3);margin-top:2px}
+.irlr-filtres{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 8px}
+.irlr-chip{border:1px solid var(--bor);background:var(--sur);color:var(--t2);border-radius:var(--rp);font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;min-height:36px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.irlr-chip[aria-pressed="true"]{background:var(--t1);color:var(--bg);border-color:var(--t1)}
+.irlr-chip .b{background:var(--sur2);color:var(--t2);border-radius:var(--rp);font-size:11px;padding:0 7px;font-weight:700}
+.irlr-chip[aria-pressed="true"] .b{background:rgba(125,125,125,.25);color:var(--bg)}
+/* Pastilles d'état — jamais de rouge (la charte rouge = retard, remplacée ici par des états calmes) */
+.irlr-pil{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:var(--rp);border:1px solid transparent;white-space:nowrap}
+.irlr-pil svg{width:12px;height:12px}
+.irlr-pil.ok{background:var(--pos-soft);color:var(--pos);border-color:color-mix(in srgb,var(--pos) 30%,transparent)}
+.irlr-pil.warn{background:var(--warn-soft);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 32%,transparent)}
+.irlr-pil.info{background:var(--info-soft);color:var(--info);border-color:color-mix(in srgb,var(--info) 28%,transparent)}
+.irlr-pil.acc{background:var(--acc-soft);color:var(--acc);border-color:color-mix(in srgb,var(--acc) 30%,transparent)}
+.irlr-pil.mut{background:var(--sur2);color:var(--t3);border-color:var(--bor)}
+/* Case à cocher */
+.irlr-ck{width:20px;height:20px;border:1.5px solid var(--t3);border-radius:5px;display:inline-grid;place-items:center;cursor:pointer;flex:0 0 auto;background:var(--sur)}
+.irlr-ck.on{background:var(--acc);border-color:var(--acc);color:var(--cta-text)}
+.irlr-ck svg{width:12px;height:12px;stroke-width:3}
+.irlr-ck.off svg{display:none}
+/* Tableau (PC/tablette) */
+.irlr-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.irlr-tbl thead th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--t3);padding:8px 10px;border-bottom:1px solid var(--bor)}
+.irlr-tbl tbody td{padding:11px 10px;border-bottom:1px solid var(--bor);vertical-align:top;font-size:13px}
+.irlr-tbl tbody tr:last-child td{border-bottom:0}
+.irlr-tbl tbody tr.sel td{background:var(--acc-soft)}
+.irlr-tbl th.ckc,.irlr-tbl td.ckc{width:30px}
+.irlr-tbl th:nth-child(2){width:180px}.irlr-tbl th:nth-child(3){width:92px}.irlr-tbl th:nth-child(4){width:104px}.irlr-tbl th:nth-child(6){width:116px}
+.irlr-tbl td{overflow-wrap:anywhere;overflow:hidden}
+.irlr-tbl .lot{font-weight:700;color:var(--t1)}
+.irlr-tbl .sub{font-size:11.5px;color:var(--t3)}
+.irlr-tbl .chg span{display:block;color:var(--t2)}
+.irlr-tbl .chg.gain span{color:var(--pos);font-weight:600}
+.irlr-tbl .chg s{display:block;text-decoration:none;font-size:11.5px;color:var(--t3);margin-top:1px;overflow-wrap:anywhere}
+.irlr-tbl .ract{text-align:right}.irlr-tbl .ract .btn{white-space:nowrap}
+.irlr-cards{display:none}
+/* Cartes (téléphone) */
+.irlr-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--rl);padding:12px 13px;margin-bottom:9px}
+.irlr-card.sel{border-color:var(--acc);background:var(--acc-soft)}
+.irlr-card .h{display:flex;align-items:flex-start;gap:10px}
+.irlr-card .h .m{flex:1;min-width:0}
+.irlr-card .h .m b{display:block;font-size:14px}
+.irlr-card .h .m s{display:block;text-decoration:none;font-size:11.5px;color:var(--t3);margin-top:1px}
+.irlr-card .chg{font-size:12.5px;color:var(--t2);margin:8px 0;overflow-wrap:anywhere}
+.irlr-card .chg span{display:block}
+.irlr-card .chg.gain span{color:var(--pos);font-weight:600}
+.irlr-card .chg s{display:block;text-decoration:none;font-size:11.5px;color:var(--t3);overflow-wrap:anywhere;white-space:normal}
+.irlr-card .acts{display:flex;gap:7px;flex-wrap:wrap}
+.irlr-card .acts .btn{flex:1 1 auto;min-height:44px}
+.irlr-vide{padding:40px 16px;text-align:center;color:var(--pos)}
+.irlr-vide svg{color:var(--pos)}.irlr-vide div{margin-top:10px;font-weight:700}
+/* Barre d'actions groupées (collante) */
+.irlr-bulk{position:sticky;bottom:0;display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--sur);border-top:1px solid var(--bor);padding:12px 16px;border-radius:0 0 var(--rl) var(--rl)}
+.irlr-bulk .lead{font-weight:700;font-size:13px}
+.irlr-bulk .lead b{color:var(--acc)}
+.irlr-bulk .sp{flex:1}
+@media(max-width:620px){
+  .irlr-sum{grid-template-columns:1fr 1fr}
+  .irlr-tbl{display:none}
+  .irlr-cards{display:block}
+  .irlr-bulk{flex-direction:column;align-items:stretch}
+  .irlr-bulk .lead{text-align:center}
+  .irlr-bulk .btn{width:100%;min-height:44px}
+}

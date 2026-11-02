@@ -427,8 +427,16 @@ export function verifierRevisionAAppliquer(input) {
   const pE = duBail(periodeEnVigueurA(bareme, ref, effet));
   const base = pV ? _montant(pV.hc) : null;
   const baremeEffet = pE ? _montant(pE.hc) : null;
+  // IRL-MOTEUR (v15.778) — ENTRÉE ANCIENNE SANS DATE D'EFFET EXPLICITE : son effet est reconstruit depuis
+  // dateApplication puis dateRevision, qui peuvent ne PAS coïncider avec la date où la migration a posé sa
+  // période 'irl' au barème. Lire le barème À CETTE date verrait le loyer d'avant et crierait « absente du
+  // barème » à tort (puis « Appliquer » écrirait une 2ᵉ période rétroactive). Quand il n'y a pas de dateEffet,
+  // la révision est réputée AU BARÈME s'il porte une période 'irl' de ce bail au nouveau montant, où qu'elle soit.
+  const sansDateEffet = !_ok(_ymd(h.dateEffet));
+  const reviseAuBareme = sansDateEffet && bareme.some((p) => p && !p._deleted && _nr(p.ref) === _nr(ref)
+    && p.source === 'irl' && (bd == null || p.bailDebut == null || _ymd(p.bailDebut) === bd) && _cents(p.hc) === _cents(nouv));
   const baseModifiee = base != null && _cents(base) !== _cents(anc);
-  const reviseModifie = baremeEffet != null && _cents(baremeEffet) !== _cents(nouv);
+  const reviseModifie = !reviseAuBareme && baremeEffet != null && _cents(baremeEffet) !== _cents(nouv);
   if (!baseModifiee && !reviseModifie) {
     if (live != null && _cents(live) === _cents(anc)) return { action: 'appliquer', hc: nouv };
     if (live != null && _cents(live) === _cents(nouv)) return { action: 'deja', hc: nouv };

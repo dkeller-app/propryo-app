@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.779';
+const IMMOTRACK_VERSION = '15.780';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -2443,8 +2443,44 @@ function agendaAutoSync() {
     _bailPurged = DB.agenda.length !== _before;
   }
 
-  if(toAdd.length || _diagPurged || _bailPurged || _mrhPurged || _irlAgendaRecale || _rappelsRetires) {
-    if(toAdd.length) DB.agenda.push(...toAdd);
+  if(toAdd.length) DB.agenda.push(...toAdd);
+
+  // IRL-RATTRAPAGE (v15.780) — L'AGENDA SUIT L'ÉTAT DE LA RÉVISION. Un rappel dont le cycle est appliqué,
+  // renoncé ou éteint (délai d'un an, art. 17-1) se ferme TOUT SEUL, avec sa note (décision Didier 23/10).
+  // Réversible : « Rouvrir » pose `autoReopened`, qu'on respecte ici. Un cycle redevenu actionnable
+  // (à réviser / à vérifier) rouvre automatiquement un rappel fermé par l'app. Logique pure : js/core/irl-rattrapage.js.
+  let _irlRappelsRanges = false;
+  if (DB.agenda && typeof window !== 'undefined' && window.IrlRattrapage && typeof _irlRappelClasse === 'function') {
+    const _logsRat = new Map((DB.logements || []).filter(x => x && !x._deleted).map(x => [x.ref, x]));
+    for (const e of DB.agenda) {
+      if (!e || e._deleted || e.cat !== 'IRL' || !e.auto || !e.autoKey) continue;
+      const l = _logsRat.get(e.logement); const _bl = DB.baux && DB.baux[e.logement];
+      const d = String(e.date || '').slice(0, 10);
+      if (!l || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      // Relecture adverse 🔴1 — SEULEMENT les rappels PASSÉS : un rappel d'une année future reste dans « À
+      // venir », jamais fermé avec une mention « délai d'un an dépassé » fausse.
+      if (d >= todayStr) continue;
+      let r; try { r = _irlRappelClasse(l, _bl, d); } catch (err) { continue; }
+      if (!r) continue;
+      if (r.ferme) {
+        if (e.autoReopened || e.classeManuel) continue;   // l'utilisateur l'a rouvert ou classé à la main : on respecte
+        // Relecture adverse 🟡3 — ne pas écraser la note d'un rappel marqué fait À LA MAIN (done sans autoDone).
+        if (e.done && !e.autoDone) continue;
+        if (!e.done || e.autoDoneRaison !== r.etat) {
+          const note = window.IrlRattrapage.noteRattrapage(r.etat, { cycleIso: d, entree: r.entree, gainMensuel: r.gainMensuel }, fmt);
+          e.done = true; e.autoDone = true; e.autoDoneRaison = r.etat; e.autoDoneAt = todayStr; e.notes = note;
+          if (typeof _stamp === 'function') _stamp(e);
+          _irlRappelsRanges = true;
+        }
+      } else if (e.autoDone && !e.classeManuel) {   // le cycle n'est plus terminal : rouvrir (sauf « fait »/classé posé à la main)
+        e.done = false; delete e.autoDone; delete e.autoDoneRaison; delete e.autoDoneAt;
+        if (typeof _stamp === 'function') _stamp(e);
+        _irlRappelsRanges = true;
+      }
+    }
+  }
+
+  if(toAdd.length || _diagPurged || _bailPurged || _mrhPurged || _irlAgendaRecale || _rappelsRetires || _irlRappelsRanges) {
     DB.agendaLastSync = todayStr;
     saveDB();
   }
@@ -7929,7 +7965,7 @@ function _accmShowAregarder(){
       +'.apl-c .pil-mk{display:inline-block;width:15px;height:15px;color:var(--acc);flex:0 0 auto}.apl-c .pil-mk svg{width:100%;height:100%;display:block}'
       +'.apl-z{font-size:13px;color:var(--t3);margin:0 2px 16px}'
       +'</style>'
-      +'<div class="atl"><div class="th"><button class="back" aria-label="Retour" onclick="rAccueil()"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>À regarder</h2></div>'+pil+rows+'</div>';
+      +'<div class="atl"><div class="th"><button class="back" aria-label="Retour" onclick="rAccueil()"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>À regarder</h2></div>'+((typeof _irlRattrapageEntryHtml==='function'&&_irlRattrapageEntryHtml())?('<div class="irlr-ban">'+_irlRattrapageEntryHtml()+'</div>'):'')+pil+rows+'</div>';
   }catch(e){ console.warn('[accmAregarder]', e); }
 }
 // Navigation PROFONDE depuis « À regarder » (téléphone) : chaque famille pointe vers l'écran d'action
@@ -8415,7 +8451,8 @@ function _renderPilotage(ctx) {
   const _enTete = fams.total ? (fams.total + ' à traiter' + (_indispoF.length ? ' · calcul des impayés incomplet' : ''))
     : (_nKoMtx ? (_nKoMtx + ' lot' + (_nKoMtx > 1 ? 's' : '') + ' à mettre en règle')
       : (_indispoF.length ? 'calcul des impayés indisponible' : 'tout est à jour'));
-  bullesEl.innerHTML = '<div class="pil-zt"><b>Ce qui presse</b><i></i><em>' + _enTete + '</em></div>'
+  const _rattTuile = (typeof _irlRattrapageEntryHtml === 'function') ? _irlRattrapageEntryHtml() : '';
+  bullesEl.innerHTML = (_rattTuile ? '<div class="irlr-ban">' + _rattTuile + '</div>' : '') + '<div class="pil-zt"><b>Ce qui presse</b><i></i><em>' + _enTete + '</em></div>'
     + _famZones.map(z => {
         const defs = _famDefs.filter(d => d.zone === z.id);
         const nz = defs.reduce((s, d) => s + (_famById[d.id] ? _famById[d.id].count : 0), 0);
@@ -25437,7 +25474,10 @@ function _irlValidConfirm() {
 
 // Exécute la révision validée (ex-corps d'applyIRL après le confirm) — dateEffetIso garantie
 // par les garde-fous de _irlValidConfirm.
-function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
+function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee, _opts) {
+  // IRL-RATTRAPAGE (v15.780) — `_opts.silent` : en traitement GROUPÉ, pas de toast ni de lettre par lot
+  // (un récapitulatif unique est montré par l'appelant). LA MÊME écriture, le même moteur.
+  const _silent = !!(_opts && _opts.silent);
   const log = DB.logements.find(l => l.ref === ref); if (!log) return;
   // AUDIT I4 — la trace du geste forcé se pose ICI, quand la révision est réellement appliquée.
   // Et elle doit être posée AVANT de lire la révision : sans elle, `_irlModeLecture` renvoie
@@ -25483,7 +25523,7 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
       const _recalc = (window.IrlRevision && typeof window.IrlRevision.nouveauLoyerIrl === 'function')
         ? window.IrlRevision.nouveauLoyerIrl(ancienHC, _vr, _vv) : Math.round(Number(ancienHC) * _vv / _vr * 100) / 100;   // IRL-MOTEUR : la formule unique
       if (Math.abs(_recalc - Number(newHC)) > 0.005) {
-        showToast(`Loyer en vigueur avant le ${fd(dateEffetIso)} : ${fmt(ancienHC)} — nouveau loyer recalculé à ${fmt(_recalc)} (même variation de l'IRL).`, 'info', 9000);
+        if (!_silent) showToast(`Loyer en vigueur avant le ${fd(dateEffetIso)} : ${fmt(ancienHC)} — nouveau loyer recalculé à ${fmt(_recalc)} (même variation de l'IRL).`, 'info', 9000);
         newHC = _recalc;
       }
     }
@@ -25503,15 +25543,15 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
       else if (DB.params && DB.params.irlForcee) delete DB.params.irlForcee[String(ref)];
     }
     const _memeMontant = Math.round(Number(_deja.nouveauHC) * 100) === Math.round(Number(newHC) * 100);
-    showToast(_memeMontant
+    if (!_silent) showToast(_memeMontant
       ? `Cette révision est déjà enregistrée (${fmt(_deja.ancienHC)} → ${fmt(_deja.nouveauHC)} au ${fd(dateEffetIso)}) : rien n'a été ajouté.`
       : `Une révision au même indice et à la même date d'effet est déjà enregistrée (${fmt(_deja.ancienHC)} → ${fmt(_deja.nouveauHC)} au ${fd(dateEffetIso)}) : elle est conservée. Pour la remplacer, la supprimer depuis l'historique du bail, puis valider à nouveau.`,
       _memeMontant ? 'info' : 'warn', 9000);
     if (typeof _auditLog === 'function') _auditLog('irl-doublon-refuse', 'bail', ref, `${ref} · ${_iVig?.key || ''} eff. ${dateEffetIso}`);
     refreshAllIRL(); _rPeriodPage();
     try { if (typeof rLogFiche === 'function' && currentPage === 'log-fiche') rLogFiche(); } catch (e) {}
-    try { previewIRLLetter(ref); } catch (e) { console.warn('[IRL] lettre (révision déjà enregistrée)', e); }
-    return;
+    if (!_silent) { try { previewIRLLetter(ref); } catch (e) { console.warn('[IRL] lettre (révision déjà enregistrée)', e); } }
+    return { ok: true, deja: true, nouveauHC: Number(_deja.nouveauHC) };
   }
   DB.irlHistorique.push({
     date:            todayLocal,            // = date du clic / d'envoi de la lettre
@@ -25552,11 +25592,11 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
   saveDB(); refreshAllIRL(); _rPeriodPage();
   // Constat 13 — la fiche du bien porte son propre bouton « Réviser » : elle se rafraîchit aussi.
   try { if (typeof rLogFiche === 'function' && currentPage === 'log-fiche') rLogFiche(); } catch (e) {}
-  if (!el('ov-irl-rappel')?.classList.contains('hidden')) {
+  if (!_silent && !el('ov-irl-rappel')?.classList.contains('hidden')) {
     _renderIRLRappelModal();
     if (!_collectIRLRappels().length) closeM('ov-irl-rappel');
   }
-  showToast(
+  if (!_silent) showToast(
     futureApplication
       ? `✓ Révision programmée au ${fd(dateEffetIso)} — le loyer actuel reste dû jusque-là. Lettre prête à envoyer.`
       : `✓ Loyer mis à jour : ${fmt(newHC)}/mois (effet ${fd(dateEffetIso)}). Lettre prête à envoyer.`,
@@ -25564,7 +25604,8 @@ function _applyIRLValidated(ref, newHC, dateEffetIso, dateAjustee) {
   );
   // IRL-REVISION R6 — valider, c'est aussi PRODUIRE LE DOCUMENT : la lettre de révision (celle de
   // l'entrée qu'on vient d'écrire) s'ouvre, avec Télécharger / Partager / Imprimer.
-  try { previewIRLLetter(ref); } catch (e) { console.warn('[IRL] lettre après validation', e); }
+  if (!_silent) { try { previewIRLLetter(ref); } catch (e) { console.warn('[IRL] lettre après validation', e); } }
+  return { ok: true, deja: false, nouveauHC: Number(newHC), dateEffet: dateEffetIso };
 }
 
 // v15.10 — Au boot, applique automatiquement les révisions IRL dont la date d'application
@@ -25843,6 +25884,267 @@ function _irlAVerifierAbandonner(idx, effetAttendu, refAttendue, nouveauAttendu)
   if (motif == null) return;
   if (!String(motif).trim()) { showToast('Motif obligatoire : l’abandon est tracé dans l’historique du bail.', 'warn', 6000); return; }
   _histoIrlSupprAppliquer(Object.assign(inp, { motif: String(motif).trim() }), a, { abandon: true, repris });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// IRL-RATTRAPAGE (v15.780) — classer un rappel de révision IRL (lot + cycle) dans l'un des six états
+// du module pur js/core/irl-rattrapage.js, à partir du journal, du barème et du moteur (computeIRLRevision,
+// _irlAVerifierDuLot, _gfGainCycle). Lu par l'agenda (fermeture auto réversible) ET par l'écran de rattrapage.
+// AUCUN calcul d'argent recopié : les montants viennent du moteur.
+// ════════════════════════════════════════════════════════════════════════════
+function _irlRappelClasse(l, bail, cycleIso) {
+  const R = (typeof window !== 'undefined') ? window.IrlRattrapage : null;
+  if (!R || typeof R.etatRappelIrl !== 'function' || !l) return null;
+  const nr = s => String(s == null ? '' : s).trim().toLowerCase();
+  const want = nr(l.ref);
+  const d = String(cycleIso || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const yC = d.slice(0, 4);
+  const bd = (bail && !bail._deleted && bail.debut) || l.debut || '';
+  // L'entrée du journal qui couvre CE cycle — par FENÊTRE de cycle (relecture Fable 🟠5), pas par année
+  // civile : une entrée legacy datée au jour anniversaire (ex. 15/12 pour un cycle au 01/01) tombe dans la
+  // bonne fenêtre. Fenêtre = (cycle − 1 an, cycle + 1 mois], ref tolérante, après le début du bail.
+  const _cyc = new Date(d + 'T00:00:00');
+  const _lo = new Date(_cyc); _lo.setFullYear(_lo.getFullYear() - 1);
+  const _hi = new Date(_cyc); _hi.setMonth(_hi.getMonth() + 1);
+  const _loIso = _lo.getFullYear() + '-' + String(_lo.getMonth() + 1).padStart(2, '0') + '-' + String(_lo.getDate()).padStart(2, '0');
+  const _hiIso = _hi.getFullYear() + '-' + String(_hi.getMonth() + 1).padStart(2, '0') + '-' + String(_hi.getDate()).padStart(2, '0');
+  let entree = null;
+  for (const h of (DB.irlHistorique || [])) {
+    if (!h || h._deleted || nr(h.ref) !== want) continue;
+    const dr = String(h.dateRevision || '').slice(0, 10);
+    if (!(dr > _loIso && dr <= _hiIso)) continue;
+    if (bd && dr < String(bd).slice(0, 10)) continue;
+    if (!entree || String(h.date || '') > String(entree.date || '')) entree = h;
+  }
+  let aVerifier = false, gain = null, reclamable = false, muet = false, nouveauHC = null, ancienHC = null, geste = null;
+  if (entree) {
+    aVerifier = !!(entree.pendingApply && entree.aVerifier);
+    nouveauHC = entree.nouveauHC; ancienHC = entree.ancienHC;
+  } else {
+    let rev = null;
+    try { rev = (typeof computeIRLRevision === 'function') ? computeIRLRevision(l) : null; } catch (e) {}
+    if (rev) {
+      const yr = String(rev.effetPrevuIso || '').slice(0, 4);
+      if (rev.isApplicable && yr === yC) {
+        reclamable = true; nouveauHC = rev.nouveauHC; ancienHC = rev.ancienHC;
+        if (rev.nouveauHC != null && rev.ancienHC != null) gain = Math.round((rev.nouveauHC - rev.ancienHC) * 100) / 100;
+        // Le geste « appliquer / renoncer » agit sur CE cycle courant (indices du moteur).
+        geste = { kind: 'areviser', effetCycle: String(rev.effetPrevuIso).slice(0, 10), montant: rev.nouveauHC, T: rev.T };
+      } else if (rev.muet) {
+        muet = true;
+      }
+      // Cycle éteint : le manque à gagner ET le geste ne valent que si CE cycle (année du rappel) est bien le
+      // cycle perdu que le moteur sait placer (relectures Fable 🔴2/🔴3/🟠4). Sinon : ni gain, ni geste.
+      if (!reclamable && !muet && rev.perdue && rev.perdue.effetIso && String(rev.perdue.effetIso).slice(0, 4) === yC) {
+        try { const g = _gfGainCycle(l, rev); if (g != null) gain = g; } catch (e) {}
+        geste = { kind: 'eteint', perdueIso: String(rev.perdue.effetIso).slice(0, 10), T: rev.T };
+      }
+    }
+  }
+  const r = R.etatRappelIrl({
+    cycleIso: d, todayIso: _todayIsoLocal(),
+    entree: entree ? { action: entree.action, pendingApply: entree.pendingApply, appliedAt: entree.appliedAt, date: entree.date, nouveauHC: entree.nouveauHC, ancienHC: entree.ancienHC, dateEffet: entree.dateEffet } : null,
+    aVerifier, reclamable, muet, gainMensuel: gain
+  });
+  // Le geste n'a de sens que pour un rappel réellement actionnable (à réviser) ou éteint placé par le moteur.
+  if (r.etat !== 'areviser' && r.etat !== 'eteint') geste = null;
+  return Object.assign({}, r, { ref: l.ref, cycleIso: d, entree, nouveauHC, ancienHC, aVerifier, geste });
+}
+
+// L'inventaire des rappels IRL passés (un par lot et par année), classés — pour l'écran de rattrapage.
+// Périmètre : les rappels d'agenda auto, de date passée ; on respecte le filtre entité global comme le reste.
+function _irlRattrapageItems() {
+  const out = [];
+  if (!Array.isArray(DB.agenda)) return out;
+  const today = _todayIsoLocal();
+  const activeEnt = (typeof _finActiveEnt === 'function') ? _finActiveEnt() : '';
+  const logs = new Map((DB.logements || []).filter(x => x && !x._deleted).map(x => [x.ref, x]));
+  for (const e of DB.agenda) {
+    if (!e || e._deleted || e.cat !== 'IRL' || !e.auto || !e.autoKey) continue;
+    const d = String(e.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d >= today) continue;   // seulement le passé (les 69)
+    if (activeEnt && e.entite && e.entite !== activeEnt) continue;
+    const l = logs.get(e.logement); const bail = DB.baux && DB.baux[e.logement];
+    if (!l) continue;
+    const r = _irlRappelClasse(l, bail, d);
+    if (!r || r.etat === 'muet') continue;   // les non révisables vivent dans « Non révisables », pas ici
+    out.push(Object.assign({ agendaId: e.id, logement: e.logement, locataire: (bail && bail.nom) || l.locataire || '' }, r));
+  }
+  // Les plus récents d'abord, actionnables en tête.
+  const rang = { averifier: 0, areviser: 1, eteint: 2, deja: 3, renoncee: 4 };
+  out.sort((a, b) => (rang[a.etat] - rang[b.etat]) || String(b.cycleIso).localeCompare(String(a.cycleIso)));
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// IRL-RATTRAPAGE — ACTIONS GROUPÉES (v15.780). Chaque action calcule D'ABORD un PLAN (sans rien
+// écrire) pour la confirmation, puis l'exécute. Zéro calcul d'argent recopié : le plan lit le moteur
+// (computeIRLRevision, nouveauLoyerIrl via _applyIRLValidated, _gfHcCycleEteint), jamais rétroactif,
+// jamais sur un mois quittancé (date d'effet par _baremeComputeDateEffetIRL + clamp). Jamais bloquant :
+// un lot non applicable (gel DPE, non calculable) est SAUTÉ et dit, le reste passe.
+// ════════════════════════════════════════════════════════════════════════════
+
+// Le rappel d'agenda d'un cycle (clé IRL:<lot>:<année>), ou null.
+function _irlRappelAgendaDe(ref, cycleIso) {
+  const key = 'IRL:' + ref + ':' + String(cycleIso || '').slice(0, 4);
+  return (DB.agenda || []).find(e => e && !e._deleted && e.autoKey === key) || null;
+}
+
+// Ferme le rappel d'agenda d'un cycle, avec une note et une raison (classé / renoncé / appliqué),
+// SANS repasser par la fermeture automatique (l'utilisateur l'a décidé : pas de `autoReopened`).
+// Un CLASSEMENT MANUEL (raison 'classe') d'un cycle non terminal pose `classeManuel` : agendaAutoSync
+// ne le rouvre pas (relecture Fable 🟡6 / adverse 🟡3).
+function _irlRappelFermerAgenda(ref, cycleIso, raison, note) {
+  const ev = _irlRappelAgendaDe(ref, cycleIso);
+  if (!ev) return false;
+  ev.done = true; ev.autoDone = true; ev.autoDoneRaison = raison; ev.autoDoneAt = _todayIsoLocal();
+  if (raison === 'classe') ev.classeManuel = true; else delete ev.classeManuel;
+  delete ev.autoReopened;
+  if (note) ev.notes = note;
+  if (typeof _stamp === 'function') _stamp(ev);
+  return true;
+}
+
+// La date d'effet d'une révision appliquée AUJOURD'HUI : jamais avant la demande (aujourd'hui), jamais
+// sur un mois déjà quittancé. Réutilise les garde-fous du moteur (source unique).
+function _irlEffetAujourdhui(ref, annivIso) {
+  const today = _todayIsoLocal();
+  const dq = (typeof _dernierMoisQuittanceYm === 'function') ? _dernierMoisQuittanceYm(ref) : null;
+  let eff = annivIso || today;
+  if (typeof window !== 'undefined' && typeof window._baremeComputeDateEffetIRL === 'function') {
+    eff = window._baremeComputeDateEffetIRL({ anniversaireIso: annivIso || today, validationIso: today, dernierMoisQuittanceYm: dq }).effetIso || eff;
+  }
+  if (typeof window !== 'undefined' && typeof window._baremeClampDateEffet === 'function') {
+    const cl = window._baremeClampDateEffet(eff, { libre: true,
+      annivMoisPremierIso: annivIso ? (window._premierDuMois ? window._premierDuMois(annivIso) : annivIso) : undefined,
+      demandeIso: today, dernierMoisQuittanceYm: dq || undefined });
+    eff = cl.effetIso || eff;
+  }
+  return eff;
+}
+
+// PLAN « appliquer dès aujourd'hui » sur une sélection (à réviser + éteints PLAÇABLES par le moteur). Les
+// « à vérifier » ne sont PAS appliqués en groupe (le loyer a changé : décider individuellement). Rien n'est
+// écrit. UNE SEULE écriture par lot et par passage (relecture Fable 🔴1 : deux révisions au même effet
+// s'écraseraient) — le cycle le plus ANCIEN du lot d'abord, les autres relancés ensuite.
+function _irlRattrapagePlanAppliquer(items) {
+  const plan = { appliquer: [], sauter: [] };
+  const _candidats = [];
+  for (const it of (items || [])) {
+    const log = (DB.logements || []).find(l => l && !l._deleted && l.ref === it.ref);
+    if (!log) { plan.sauter.push({ ref: it.ref, raison: 'Logement introuvable' }); continue; }
+    if (it.etat === 'averifier') { plan.sauter.push({ ref: it.ref, raison: 'À décider individuellement (le loyer a changé depuis la validation)' }); continue; }
+    if (it.etat !== 'areviser' && it.etat !== 'eteint') { plan.sauter.push({ ref: it.ref, raison: 'Rien à appliquer' }); continue; }
+    if (!it.geste) { plan.sauter.push({ ref: it.ref, raison: 'Cycle trop ancien à placer — classer ou renoncer' }); continue; }
+    let rev = null; try { rev = computeIRLRevision(log); } catch (e) {}
+    if (!rev) { plan.sauter.push({ ref: it.ref, raison: 'Révision non calculable' }); continue; }
+    if (rev.gelDpeFG) { plan.sauter.push({ ref: it.ref, raison: `Loyer gelé — DPE ${rev.dpe} (loi Climat, art. 23)` }); continue; }
+    let newHC = null, cycleEteint = null, anniv = rev.effetPrevuIso || '';
+    if (it.geste.kind === 'areviser') {
+      if (!rev.isApplicable || rev.nouveauHC == null) { plan.sauter.push({ ref: it.ref, raison: 'Plus applicable (déjà traité ou indice manquant)' }); continue; }
+      newHC = rev.nouveauHC;
+    } else {   // éteint : appliquer POUR L'AVENIR, sur les indices du cycle perdu (jamais rétroactif)
+      const hc = _gfHcCycleEteint(log, rev);
+      if (hc == null) { plan.sauter.push({ ref: it.ref, raison: 'Montant du cycle éteint non calculable (indice de l’époque manquant)' }); continue; }
+      newHC = hc; cycleEteint = it.geste.perdueIso; anniv = _todayIsoLocal();
+    }
+    const effet = _irlEffetAujourdhui(it.ref, anniv);
+    const base = (typeof window !== 'undefined' && typeof window._loyerBaseRevisionHC === 'function')
+      ? window._loyerBaseRevisionHC(DB.loyerBareme || [], it.ref, effet, log.hc, (DB.baux[it.ref] && DB.baux[it.ref].debut) || log.debut || null)
+      : Number(log.hc) || 0;
+    _candidats.push({ ref: it.ref, etat: it.etat, cycleIso: it.cycleIso, ancienHC: base, nouveauHC: newHC, effet, cycleEteint });
+  }
+  // Un seul cycle par lot et par passage : le plus ANCIEN (compounding correct) ; les autres relancés ensuite.
+  const _parLot = {};
+  for (const c of _candidats) {
+    const prev = _parLot[c.ref];
+    if (!prev) { _parLot[c.ref] = c; continue; }
+    const ancien = String(c.cycleIso) < String(prev.cycleIso) ? c : prev;
+    const autre = ancien === c ? prev : c;
+    _parLot[c.ref] = ancien;
+    plan.sauter.push({ ref: autre.ref, raison: 'Un cycle par lot et par passage — relancer après le premier' });
+  }
+  plan.appliquer = Object.keys(_parLot).map(k => _parLot[k]);
+  return plan;
+}
+
+// EXÉCUTE le plan « appliquer » : une seule écriture par lot via _applyIRLValidated (silencieux), le
+// forçage cycle-éteint posé AVANT l'écriture (le moteur pose les indices du cycle perdu). Agenda rangé après.
+function _irlRattrapageExecAppliquer(plan) {
+  let ok = 0;
+  for (const p of (plan.appliquer || [])) {
+    const log = (DB.logements || []).find(l => l && !l._deleted && l.ref === p.ref);
+    if (!log) continue;
+    try {
+      if (p.cycleEteint) {
+        _irlForcageEnAttente = { ref: p.ref, cycle: p.cycleEteint, le: td(), par: (typeof _qeQui === 'function') ? _qeQui() : '', motif: 'cycle-eteint' };
+      }
+      const r = _applyIRLValidated(p.ref, p.nouveauHC, p.effet, false, { silent: true });
+      // r.deja = une révision identique existait déjà (rien écrit) : on ferme le rappel mais on ne la compte
+      // pas comme « appliquée » (relecture Fable 🟠4 : le toast ne doit pas mentir).
+      if (r && r.ok) { if (!r.deja) ok++; _irlRappelFermerAgenda(p.ref, p.cycleIso, 'applique', `Révision appliquée à partir du ${fd(p.effet)} (rattrapage). Rappel fermé.`); }
+    } catch (e) { console.warn('[IRL rattrapage apply]', p.ref, e); _irlForcageEnAttente = null; }
+  }
+  if (typeof agendaAutoSync === 'function') { try { agendaAutoSync(); } catch (e) {} }
+  saveDB(); refreshAllIRL();
+  return ok;
+}
+
+// RENONCER en groupe (un motif commun) : enregistre une renonciation pour le CYCLE EXACT du rappel (relectures
+// Fable 🔴2/🔴3), avec ses propres indices, loyer maintenu. Les cycles trop anciens à placer (sans geste) ne
+// sont pas renoncés (seul « marquer fait » les classe).
+function _irlRattrapageRenoncer(items, motif) {
+  let n = 0;
+  const _C = (typeof window !== 'undefined') ? window.IrlCalendrier : null;
+  for (const it of (items || [])) {
+    if ((it.etat !== 'areviser' && it.etat !== 'eteint') || !it.geste) continue;
+    const log = (DB.logements || []).find(l => l && !l._deleted && l.ref === it.ref);
+    if (!log) continue;
+    let rev = null; try { rev = computeIRLRevision(log); } catch (e) {}
+    let cycleIso, iRef = null, iVig = null;
+    if (it.geste.kind === 'areviser') {
+      cycleIso = it.geste.effetCycle;
+      iRef = rev && rev.irlRef; iVig = rev && rev.irlVigueur;
+    } else {   // éteint : les indices DU CYCLE PERDU (anneeIndice), jamais ceux du cycle courant.
+      cycleIso = it.geste.perdueIso;
+      const T = it.geste.T;
+      const nI = (_C && typeof _C.anneeIndice === 'function' && T) ? _C.anneeIndice(T, cycleIso) : null;
+      if (nI != null && typeof irlVal === 'function') {
+        iRef = { key: `T${T} ${nI - 1}`, val: irlVal(T, nI - 1) };
+        iVig = { key: `T${T} ${nI}`, val: irlVal(T, nI) };
+      }
+    }
+    const dRev = /^\d{4}-\d{2}-\d{2}$/.test(String(cycleIso)) ? new Date(cycleIso + 'T00:00:00') : (rev && rev.dateRevision) || null;
+    _pushIRLHistorique(log, iRef, iVig, dRev, log.hc, 'renonciation');
+    const last = DB.irlHistorique[DB.irlHistorique.length - 1];
+    if (last && motif) last.motif = String(motif).trim();
+    const cyIso = (dRev instanceof Date) ? _isoLocal(dRev) : String(cycleIso).slice(0, 10);
+    if (!(String(log.irlDerniereApplication || '') > cyIso)) log.irlDerniereApplication = cyIso;
+    if (DB.baux[it.ref]) { DB.baux[it.ref].irlDerniereApplication = log.irlDerniereApplication; _stamp(DB.baux[it.ref]); }
+    _stamp(log);
+    _irlRappelFermerAgenda(it.ref, it.cycleIso, 'renoncee', `Révision renoncée le ${fd(_todayIsoLocal())}${motif ? ' : ' + String(motif).trim() : ''}. Loyer maintenu. Rappel fermé.`);
+    if (typeof _auditLog === 'function') _auditLog('irl-renoncee-groupe', 'bail', it.ref, `${it.ref} · cycle ${cyIso}${motif ? ' : ' + String(motif).trim() : ''}`);
+    n++;
+  }
+  if (n) { if (typeof agendaAutoSync === 'function') { try { agendaAutoSync(); } catch (e) {} } saveDB(); refreshAllIRL(); }
+  return n;
+}
+
+// MARQUER FAIT (sans appliquer) : classe le rappel d'agenda, le loyer ne bouge pas. Pour un cycle encore
+// réclamable, c'est un classement assumé (il reviendra à l'anniversaire suivant) — et agendaAutoSync ne le
+// rouvre plus (classeManuel).
+function _irlRattrapageMarquerFait(items) {
+  let n = 0;
+  for (const it of (items || [])) {
+    const manuel = (it.etat === 'areviser' || it.etat === 'averifier');
+    const note = manuel
+      ? `Classé sans réviser le ${fd(_todayIsoLocal())} (loyer inchangé). La révision reviendra à l'anniversaire suivant.`
+      : (window.IrlRattrapage ? window.IrlRattrapage.noteRattrapage(it.etat, { cycleIso: it.cycleIso, entree: it.entree, gainMensuel: it.gainMensuel }, fmt) : '');
+    if (_irlRappelFermerAgenda(it.ref, it.cycleIso, manuel ? 'classe' : it.etat, note)) n++;
+  }
+  if (n) { saveDB(); refreshAllIRL(); }
+  return n;
 }
 
 // RETOURS 15/10 (lot 1, point 2) — MIGRATION DE DONNÉES idempotente : une seule entrée vivante par

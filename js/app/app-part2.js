@@ -1647,6 +1647,206 @@ function _lyLigneRevAVerifier({ e, index, av }) {
   }) };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// IRL-RATTRAPAGE — L'ÉCRAN GROUPÉ (v15.780). Ranger en une fois les anciens rappels de révision IRL :
+// état d'un coup d'œil, détail au clic, cases à cocher + actions groupées. Jamais de rétroactivité,
+// jamais d'écriture sur un mois quittancé, rien sans confirmation. Logique : app-part1 (plan/exec),
+// cœur pur : js/core/irl-rattrapage.js. Maquette validée : mockups/IRL-RATTRAPAGE/maquette.html.
+// ════════════════════════════════════════════════════════════════════════════
+var _irlRattUI = { sel: null, filtre: 'tous' };
+
+// L'entrée vers l'écran (bandeau Agenda + tuile « À regarder ») : '' quand rien n'attend une décision.
+function _irlRattrapageEntryHtml() {
+  if (typeof _irlRattrapageItems !== 'function') return '';
+  let items = []; try { items = _irlRattrapageItems(); } catch (e) { return ''; }
+  if (!items.length) return '';
+  const act = items.filter(x => x.actionnable).length;
+  if (!act) return '';
+  const t = (window.IrlRattrapage ? window.IrlRattrapage.trierRattrapage(items) : { recuperable: 0 });
+  const sous = `${act} révision${act > 1 ? 's' : ''} à décider` + (t.recuperable > 0 ? ` · +${fmt(t.recuperable)}/mois récupérables pour l'avenir` : '');
+  return `<button type="button" class="irlr-entry" onclick="_irlRattrapageOuvrir()">
+    <span class="ic">${_uiIcon('chart', 19)}</span>
+    <span class="m"><span class="t">Révisions IRL à ranger</span><span class="s">${escHtml(sous)}</span></span>
+    <span class="cnt">${act}</span>${_uiIcon('chevron-right', 16)}</button>`;
+}
+
+function _irlRattrapageOuvrir() {
+  _irlRattUI = { sel: new Set(), filtre: 'tous' };
+  let ov = el('ov-irl-ratt');
+  if (!ov) { ov = document.createElement('div'); ov.className = 'ov hidden'; ov.id = 'ov-irl-ratt'; document.body.appendChild(ov); }
+  _irlRattrapageRender();
+  openM('ov-irl-ratt');
+}
+
+function _irlRattEtatPil(etat) {
+  switch (etat) {
+    case 'deja': return `<span class="irlr-pil ok">${_uiIcon('check', 12)} Déjà à jour</span>`;
+    case 'renoncee': return `<span class="irlr-pil info">${_uiIcon('close', 12)} Renoncée</span>`;
+    case 'averifier': return `<span class="irlr-pil warn">${_uiIcon('warn', 12)} À vérifier</span>`;
+    case 'areviser': return `<span class="irlr-pil acc">${_uiIcon('chart', 12)} À réviser</span>`;
+    case 'eteint': return `<span class="irlr-pil mut">${_uiIcon('lock', 12)} Éteint</span>`;
+    default: return '';
+  }
+}
+function _irlRattChangeTxt(it) {
+  const g = (typeof it.gainMensuel === 'number') ? it.gainMensuel : null;
+  switch (it.etat) {
+    case 'deja': return `<span>Rien : loyer déjà révisé, le rappel se ferme</span>` + (it.entree && it.entree.appliedAt ? `<s>appliqué le ${fd(it.entree.appliedAt)}</s>` : '');
+    case 'renoncee': return `<span>Rien : renoncée, le rappel se ferme</span>`;
+    case 'eteint': return it.geste ? (`<span>Plus réclamable au passé (délai d'un an)</span>` + (g != null && g > 0 ? `<s>≈ ${fmt(g)}/mois perdus · applicable dès aujourd'hui</s>` : `<s>applicable dès aujourd'hui</s>`)) : `<span>Cycle trop ancien à placer — classer ou renoncer</span>`;
+    case 'areviser': return `<span class="gain">+${g != null ? fmt(g) : '—'}/mois à partir d'aujourd'hui</span>` + (it.ancienHC != null && it.nouveauHC != null ? `<s>${fmt(it.ancienHC)} → ${fmt(it.nouveauHC)}</s>` : '');
+    case 'averifier': return `<span>Loyer changé depuis la validation</span>` + (it.entree ? `<s>barème ${fmt(it.entree.nouveauHC)} · bail ${it.ancienHC != null ? fmt(it.ancienHC) : '—'}</s>` : '');
+    default: return '';
+  }
+}
+function _irlRattActionBtn(it) {
+  const id = `'${_lyQ(String(it.agendaId))}'`;
+  if (it.etat === 'areviser') return `<button class="btn bp bb" onclick="_irlRattUne('appliquer',${id})">Appliquer</button>`;
+  if (it.etat === 'eteint') return it.geste ? `<button class="btn bs bb" onclick="_irlRattUne('appliquer',${id})">Traiter…</button>` : `<button class="btn bs bb" onclick="_irlRattUne('fermer',${id})">Fermer</button>`;
+  if (it.etat === 'averifier') return `<button class="btn bs bb" onclick="_irlRattDecider(${id})">Décider…</button>`;
+  return `<button class="btn bs bb" onclick="_irlRattUne('fermer',${id})">Fermer</button>`;
+}
+
+function _irlRattrapageRender() {
+  const ov = el('ov-irl-ratt'); if (!ov) return;
+  const all = _irlRattrapageItems();
+  const tri = window.IrlRattrapage ? window.IrlRattrapage.trierRattrapage(all) : { parEtat: {}, actionnables: 0, recuperable: 0 };
+  const pe = tri.parEtat || {};
+  const f = _irlRattUI.filtre;
+  const items = f === 'decider' ? all.filter(x => x.actionnable)
+    : f === 'deja' ? all.filter(x => x.etat === 'deja' || x.etat === 'renoncee')
+    : f === 'eteint' ? all.filter(x => x.etat === 'eteint') : all;
+  const sel = _irlRattUI.sel;
+  // garder la sélection cohérente avec ce qui est affiché
+  const visibles = new Set(items.map(x => x.agendaId));
+  [...sel].forEach(id => { if (!visibles.has(id)) sel.delete(id); });
+
+  const sum = `<div class="irlr-sum">
+    <div class="k"><div class="lbl">Déjà à jour</div><div class="v">${(pe.deja || 0) + (pe.renoncee || 0)}</div><div class="s">loyer bon, rappel à fermer</div></div>
+    <div class="k"><div class="lbl">Cycles éteints</div><div class="v">${pe.eteint || 0}</div><div class="s">délai d'un an dépassé</div></div>
+    <div class="k"><div class="lbl">À décider</div><div class="v ${tri.actionnables ? 'pos' : ''}">${tri.actionnables || 0}</div><div class="s">applicables dès aujourd'hui</div></div>
+    <div class="k"><div class="lbl">Récupérable / mois</div><div class="v ${tri.recuperable > 0 ? 'pos' : ''}">${tri.recuperable > 0 ? '+' + fmt(tri.recuperable) : '—'}</div><div class="s">pour l'avenir, hors rétroactif</div></div>
+  </div>`;
+
+  const chip = (k, lbl, n) => `<button type="button" class="irlr-chip" aria-pressed="${f === k}" onclick="_irlRattFiltre('${k}')">${escHtml(lbl)} <span class="b">${n}</span></button>`;
+  const filtres = `<div class="irlr-filtres">${chip('tous', 'Tous', all.length)}${chip('decider', 'À décider', tri.actionnables || 0)}${chip('deja', 'Déjà à jour', (pe.deja || 0) + (pe.renoncee || 0))}${chip('eteint', 'Éteints', pe.eteint || 0)}</div>`;
+
+  const ck = (on, onclick) => `<span class="irlr-ck ${on ? 'on' : 'off'}" role="checkbox" aria-checked="${on}" tabindex="0" onclick="${onclick}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">${_uiIcon('check', 12)}</span>`;
+  const rows = items.map(it => {
+    const on = sel.has(it.agendaId);
+    const idq = `'${_lyQ(String(it.agendaId))}'`;
+    return `<tr class="${on ? 'sel' : ''}">
+      <td class="ckc">${ck(on, `_irlRattSel(${idq})`)}</td>
+      <td><div class="lot">${escHtml(_logLabel(it.logement))}</div><div class="sub">${escHtml(it.locataire || '—')}</div></td>
+      <td>${fd(it.cycleIso)}</td>
+      <td>${_irlRattEtatPil(it.etat)}</td>
+      <td class="chg ${it.etat === 'areviser' ? 'gain' : ''}">${_irlRattChangeTxt(it)}</td>
+      <td class="ract">${_irlRattActionBtn(it)}</td></tr>`;
+  }).join('');
+  const cards = items.map(it => {
+    const on = sel.has(it.agendaId);
+    const idq = `'${_lyQ(String(it.agendaId))}'`;
+    return `<div class="irlr-card ${on ? 'sel' : ''}"><div class="h">${ck(on, `_irlRattSel(${idq})`)}
+      <div class="m"><b>${escHtml(_logLabel(it.logement))}</b><s>${escHtml(it.locataire || '—')} · cycle ${fd(it.cycleIso)}</s></div>${_irlRattEtatPil(it.etat)}</div>
+      <div class="chg ${it.etat === 'areviser' ? 'gain' : ''}">${_irlRattChangeTxt(it)}</div>
+      <div class="acts">${_irlRattActionBtn(it)}</div></div>`;
+  }).join('');
+
+  const nSel = sel.size;
+  const anyAppl = items.some(it => sel.has(it.agendaId) && it.geste && (it.etat === 'areviser' || it.etat === 'eteint'));
+  const bulk = `<div class="irlr-bulk">
+    <span class="lead">${nSel ? `<b>${nSel}</b> cycle${nSel > 1 ? 's' : ''} sélectionné${nSel > 1 ? 's' : ''}` : 'Cocher des cycles pour une action groupée'}</span>
+    <span class="sp"></span>
+    <button class="btn bb" ${nSel ? '' : 'disabled'} onclick="_irlRattBulk('fait')">${_uiIcon('check', 15)} Marquer fait</button>
+    <button class="btn bb" ${nSel ? '' : 'disabled'} onclick="_irlRattBulk('renoncer')">${_uiIcon('close', 15)} Renoncer…</button>
+    <button class="btn bp bb" ${anyAppl ? '' : 'disabled'} onclick="_irlRattBulk('appliquer')">${_uiIcon('chart', 15)} Appliquer dès aujourd'hui</button>
+  </div>`;
+
+  const vide = `<div class="irlr-vide">${_uiIcon('check', 28)}<div>Aucun rappel de révision IRL à ranger.</div></div>`;
+  ov.innerHTML = `<div class="modal irlr" role="dialog" aria-modal="true" aria-label="Rattrapage des révisions IRL">
+    <div class="m-head"><h3>Rattrapage des révisions IRL<small>${all.length} rappel${all.length > 1 ? 's' : ''} ancien${all.length > 1 ? 's' : ''}</small></h3>
+      <button type="button" class="m-close" onclick="closeM('ov-irl-ratt')" aria-label="Fermer">${_uiIcon('close', 16)}</button></div>
+    <div class="m-body">
+      ${sum}${filtres}
+      ${items.length ? `<table class="irlr-tbl"><thead><tr><th class="ckc"></th><th>Lot</th><th>Cycle</th><th>État</th><th>Ce qui changerait</th><th></th></tr></thead><tbody>${rows}</tbody></table><div class="irlr-cards">${cards}</div>` : vide}
+    </div>
+    ${items.length ? bulk : ''}</div>`;
+}
+
+function _irlRattFiltre(k) { _irlRattUI.filtre = k; _irlRattrapageRender(); }
+function _irlRattSel(id) { const s = _irlRattUI.sel; if (s.has(id)) s.delete(id); else s.add(id); _irlRattrapageRender(); }
+function _irlRattItemDe(id) { return _irlRattrapageItems().find(x => String(x.agendaId) === String(id)) || null; }
+
+// Décider une révision « à vérifier » : l'écran Loyers › Révisions porte déjà les gestes (recalculé / garder / abandonner).
+function _irlRattDecider(id) {
+  const it = _irlRattItemDe(id); if (!it) { showToast('Cette ligne a changé : rouvrir le rattrapage.', 'info', 5000); return; }
+  closeM('ov-irl-ratt');
+  if (typeof go === 'function') go('loyers');
+  showToast('Révision à vérifier : la décision (recalculer, garder, abandonner) se prend dans le bloc « Révisions ».', 'info', 7000);
+}
+
+// Action sur UNE ligne (bouton de la ligne) : appliquer, ou fermer (classer sans appliquer).
+function _irlRattUne(action, id) {
+  const it = _irlRattItemDe(id); if (!it) { _irlRattrapageRender(); return; }
+  if (action === 'fermer') {
+    if (!confirm2(`Fermer le rappel de révision de ${_logLabelRef(it.ref)} (cycle du ${fd(it.cycleIso)}) ?\nLe loyer ne change pas.`)) return;
+    _irlRattrapageMarquerFait([it]);
+    _irlRattApres();
+    return;
+  }
+  // appliquer (une seule ligne)
+  _irlRattAppliquer([it]);
+}
+
+// Action GROUPÉE depuis la barre.
+function _irlRattBulk(action) {
+  const sel = _irlRattUI.sel; if (!sel || !sel.size) return;
+  const items = _irlRattrapageItems().filter(x => sel.has(x.agendaId));
+  if (!items.length) { _irlRattrapageRender(); return; }
+  if (action === 'fait') {
+    if (!confirm2(`Marquer fait ${items.length} rappel${items.length > 1 ? 's' : ''} de révision ?\nLe loyer ne change pas ; les rappels sont classés.`)) return;
+    const n = _irlRattrapageMarquerFait(items); _irlRattApres(); showToast(`${n} rappel${n > 1 ? 's' : ''} classé${n > 1 ? 's' : ''}.`, 'ok', 5000); return;
+  }
+  if (action === 'renoncer') {
+    const cibles = items.filter(x => x.geste && (x.etat === 'areviser' || x.etat === 'eteint'));
+    if (!cibles.length) { showToast('Renoncer ne concerne que les cycles à réviser ou éteints.', 'info', 6000); return; }
+    const motif = (typeof window.prompt === 'function') ? window.prompt(`Renoncer à ${cibles.length} révision${cibles.length > 1 ? 's' : ''} (loyer maintenu, droit abandonné pour ces cycles) ?\n\nMotif commun (obligatoire, tracé ; modifiable ensuite par lot dans l'historique du bail) :`, '') : null;
+    if (motif == null) return;
+    if (!String(motif).trim()) { showToast('Motif obligatoire : la renonciation est tracée.', 'warn', 6000); return; }
+    const n = _irlRattrapageRenoncer(cibles, String(motif).trim()); _irlRattApres(); showToast(`${n} révision${n > 1 ? 's' : ''} renoncée${n > 1 ? 's' : ''}.`, 'ok', 5000); return;
+  }
+  if (action === 'appliquer') _irlRattAppliquer(items);
+}
+
+// APPLIQUER (une ou plusieurs) : plan d'abord (sans écrire), confirmation qui dit tout, puis exécution.
+function _irlRattAppliquer(items) {
+  const plan = _irlRattrapagePlanAppliquer(items);
+  if (!plan.appliquer.length) {
+    const r = (plan.sauter[0] && plan.sauter[0].raison) || 'Rien à appliquer';
+    showToast(plan.sauter.length ? `Rien appliqué : ${r}.` : 'Rien à appliquer.', 'info', 7000);
+    return;
+  }
+  const lignes = plan.appliquer.map(p => `• ${_logLabel(p.ref)} — ${fmt(p.ancienHC)} → ${fmt(p.nouveauHC)} (+${fmt(Math.round((p.nouveauHC - p.ancienHC) * 100) / 100)}/mois)${p.cycleEteint ? ' · cycle éteint, pour l\'avenir' : ''}`).join('\n');
+  const skips = plan.sauter.length ? '\n\nNon appliqués :\n' + plan.sauter.map(s => `• ${_logLabel(s.ref)} — ${s.raison}`).join('\n') : '';
+  const msg = `Appliquer ${plan.appliquer.length} révision${plan.appliquer.length > 1 ? 's' : ''} à partir d'aujourd'hui ?\n\n`
+    + `Nouveau loyer à compter du 1er du mois, jamais rétroactif ; les mois déjà quittancés gardent le loyer de leur quittance.\n\n`
+    + lignes + skips + `\n\nUne lettre de révision est préparée pour chaque locataire.`;
+  if (!confirm2(msg)) return;
+  const n = _irlRattrapageExecAppliquer(plan);
+  _irlRattApres();
+  showToast(`✓ ${n} révision${n > 1 ? 's' : ''} appliquée${n > 1 ? 's' : ''} à partir d'aujourd'hui. Lettre${n > 1 ? 's' : ''} prête${n > 1 ? 's' : ''}.`, 'ok', 7000);
+}
+
+// Après une action : ré-afficher (ou fermer si plus rien), et rafraîchir l'agenda / les loyers s'ils sont ouverts.
+function _irlRattApres() {
+  const reste = _irlRattrapageItems();
+  if (!reste.length) closeM('ov-irl-ratt'); else { if (_irlRattUI.sel) _irlRattUI.sel.clear(); _irlRattrapageRender(); }
+  try { if (typeof currentPage !== 'undefined' && currentPage === 'agenda' && typeof rAgenda === 'function') rAgenda(); } catch (e) {}
+  try { if (typeof currentPage !== 'undefined' && currentPage === 'loyers' && typeof rLoyers === 'function') rLoyers(); } catch (e) {}
+  try { if (typeof currentPage !== 'undefined' && currentPage === 'accueil' && typeof rAccueil === 'function') rAccueil(); } catch (e) {}
+}
+if (typeof window !== 'undefined') { window._irlRattrapageOuvrir = _irlRattrapageOuvrir; window._irlRattrapageEntryHtml = _irlRattrapageEntryHtml; }
+
 /** Le manque à gagner d'un cycle éteint, calculé sur les indices DE CE CYCLE (jamais ceux
  *  du cycle en cours : autre année, autre ratio — ce serait un chiffre faux sous un
  *  libellé factuel). Retourne null si l'indice de l'époque n'est pas connu. */
@@ -1741,7 +1941,10 @@ function _lyFriseRuban(etats) {
     ref: e.ref,
     libelle: (e.log.locataire || '') + (e.bail && e.bail.debut ? ' · bail du ' + fd(e.bail.debut) : ''),
     etat: { etat: rev.etat, effetPrevuIso: rev.effetPrevuIso || '', rappelYm: rev.rappelYm || '', muet: !!rev.muet,
-      programmee: rev.programmee || null }   // R5 — la tuile d'une révision programmée = son mois d'effet
+      programmee: rev.programmee || null,
+      // IRL-MOTEUR (v15.776) — ce lot a-t-il une révision « à vérifier » (effet atteint, loyer non à jour) ?
+      // La tuile du ruban le dit au lieu de « faite ». Lu par ganttRevisions/rubanRevisions.
+      aVerifier: (typeof _irlAVerifierDuLot === 'function') && _irlAVerifierDuLot(e.ref).length > 0 }   // R5 — la tuile d'une révision programmée = son mois d'effet
   }));
   const r = window.IrlCalendrier.rubanRevisions(window.IrlCalendrier.ganttRevisions(lots, today));
   if (!r.mois.length) return '';
@@ -1753,18 +1956,22 @@ function _lyFriseRuban(etats) {
   // chiffre ≥ 1 ET un mot ; le gris veut dire « rien ce mois-ci » (I18).
   const tuiles = r.mois.map(m => {
     const aFaire = m.nbEffet;                 // révisions à préparer/en retard ce mois
+    const aVerif = m.nbAVerifier || 0;        // IRL-MOTEUR : effet atteint mais loyer non à jour — à vérifier
     const faites = m.nbFaite;                 // révisions déjà appliquées ce mois (jamais rendues avant)
-    const kind = aFaire > 0 ? 'eff' : (faites > 0 ? 'fait' : '');
-    const n = aFaire > 0 ? aFaire : faites;   // le chiffre de la tuile colorée
+    // Priorité : à faire (orange) > à vérifier (ambre) > faite (verte).
+    const kind = aFaire > 0 ? 'eff' : (aVerif > 0 ? 'averif' : (faites > 0 ? 'fait' : ''));
+    const n = aFaire > 0 ? aFaire : (aVerif > 0 ? aVerif : faites);   // le chiffre de la tuile colorée
     // R5 — une tuile verte dont toutes les révisions sont PROGRAMMÉES dit « programmée » : le
     // loyer n'a pas encore changé, « faite » serait faux.
     const toutesProg = faites > 0 && (m.faite || []).every(f => f && f.etat === 'programmee');
     const mot = aFaire > 0 ? 'à faire'
-      : (faites > 0 ? (toutesProg ? (faites > 1 ? 'programmées' : 'programmée') : (faites > 1 ? 'faites' : 'faite')) : '—');
+      : (aVerif > 0 ? (aVerif > 1 ? 'à vérifier' : 'à vérifier')
+      : (faites > 0 ? (toutesProg ? (faites > 1 ? 'programmées' : 'programmée') : (faites > 1 ? 'faites' : 'faite')) : '—'));
     const cls = 'fr-m' + (kind ? ' ' + kind : '')
       + (m.courant ? ' now' : '') + (_lyUI.frise === m.ym ? ' sel' : '');
     const titre = `${_LY_MOIS_COURT[m.mois - 1]} ${m.annee} — `
       + (aFaire > 0 ? `${aFaire} révision${aFaire > 1 ? 's' : ''} à faire`
+         : aVerif > 0 ? `${aVerif} révision${aVerif > 1 ? 's' : ''} à vérifier`
          : faites > 0 ? `${faites} révision${faites > 1 ? 's' : ''} faite${faites > 1 ? 's' : ''}`
          : 'rien ce mois-ci')
       + (m.nbGel ? `, ${m.nbGel} lot${m.nbGel > 1 ? 's' : ''} non révisable${m.nbGel > 1 ? 's' : ''}` : '');
@@ -1783,6 +1990,7 @@ function _lyFriseRuban(etats) {
     // lecture seule, rendue enfin) et non révisable (motif muet). Sans les faites, une tuile
     // verte s'ouvrait sur « Rien ce mois-ci » — le défaut que D24 corrige.
     const items = (sel.effet || []).map(x => ({ x, kind: 'effet' }))
+      .concat((sel.averifier || []).map(x => ({ x, kind: 'averifier' })))   // IRL-MOTEUR : à vérifier (décision)
       .concat((sel.faite || []).map(x => ({ x, kind: 'faite' })))
       .concat((sel.gel || []).map(x => ({ x, kind: 'gel' })));
     const lignes = items.map(({ x, kind }) => {
@@ -1794,6 +2002,15 @@ function _lyFriseRuban(etats) {
           <span class="mu">${escHtml(_lyMotifMuet(o.rev))}</span>
           <span class="am"><span class="ly2-p nu">${escHtml(_lyPastilleMuet(o.rev))}</span></span>
           <span class="ac"></span></div>`;
+      }
+      if (kind === 'averifier') {
+        // IRL-MOTEUR (v15.776) — effet atteint, loyer non à jour : une DÉCISION, pas une révision « faite ».
+        const _av = (typeof _irlAVerifierDuLot === 'function') ? _irlAVerifierDuLot(x.ref) : [];
+        const _c = (_av.length && typeof _irlAVerifierCalc === 'function') ? _irlAVerifierCalc(_av[0].index) : null;
+        return `<div class="ln"><span class="who"><b>${escHtml(_logLabel(x.ref))}</b> <span class="mu" style="display:inline">${escHtml(x.libelle || '')}</span></span>
+          <span class="mu">${_c ? escHtml(_irlAVerifierTexte(_c.av)) : 'Révision à vérifier : le loyer a changé depuis la validation.'}</span>
+          <span class="am"><span class="ly2-p wa">à vérifier</span></span>
+          <span class="ac">${(_av.length) ? `<span class="ly2-irlv">${_irlAVerifierBoutons(_av[0].index)}</span>` : ''}</span></div>`;
       }
       if (kind === 'faite') {
         // Programmée : le nouveau loyer n'est pas encore en vigueur (projection du cycle, loyer
@@ -1821,6 +2038,7 @@ function _lyFriseRuban(etats) {
     }).join('');
     const hParts = [];
     if (sel.nbEffet) hParts.push(`${sel.nbEffet} à faire`);
+    if (sel.nbAVerifier) hParts.push(`${sel.nbAVerifier} à vérifier`);
     if (sel.nbFaite) hParts.push(`${sel.nbFaite} faite${sel.nbFaite > 1 ? 's' : ''}`);
     if (sel.nbGel) hParts.push(`${sel.nbGel} non révisable${sel.nbGel > 1 ? 's' : ''}`);
     detail = `<div class="fr-det"><div class="h">${_LY_MOIS_COURT[sel.mois - 1]} ${sel.annee} — ${hParts.join(' · ') || 'rien ce mois-ci'}
@@ -17710,7 +17928,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.779 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.780 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }
@@ -27884,7 +28102,8 @@ function rAgendaList() {
     _ensureAgendaPhCss(); _rAgendaListPhone({overdue,soon7,soon30,rest,done:donePh}); return;
   }
 
-  el('agenda-overdue-section').innerHTML = _agendaSection(_uiIcon('warn',13) + ' En retard', overdue);
+  const _rattBan = (typeof _irlRattrapageEntryHtml==='function') ? _irlRattrapageEntryHtml() : '';
+  el('agenda-overdue-section').innerHTML = (_rattBan ? '<div class="irlr-ban">'+_rattBan+'</div>' : '') + _agendaSection(_uiIcon('warn',13) + ' En retard', overdue);
   el('agenda-soon7-section').innerHTML   = _agendaSection(_uiIcon('bell',13) + ' Cette semaine (7 jours)', soon7);
   el('agenda-soon30-section').innerHTML  = _agendaSection(_uiIcon('calendar',13) + ' Ce mois (30 jours)', soon30);
   el('agenda-rest-section').innerHTML    = _agendaSection(_uiIcon('list',13) + ' À venir', rest) + _agendaSection(_uiIcon('check',13) + ' Terminés', done, false);
@@ -28037,7 +28256,8 @@ function _rAgendaListPhone(g){
   // (pas _daysFrom qui intègre l'heure courante → un événement à J-30 pile ne clignote pas selon l'heure).
   const cut = new Date(); cut.setHours(0,0,0,0); cut.setDate(cut.getDate()-30);
   const done30 = g.done.filter(e=>new Date(e.date+'T00:00:00') >= cut);
-  el('agenda-overdue-section').innerHTML = _agendaSectionPhone(_uiIcon('warn'),'En retard',g.overdue,true);
+  const _rattBanP = (typeof _irlRattrapageEntryHtml==='function') ? _irlRattrapageEntryHtml() : '';
+  el('agenda-overdue-section').innerHTML = (_rattBanP ? '<div class="irlr-ban">'+_rattBanP+'</div>' : '') + _agendaSectionPhone(_uiIcon('warn'),'En retard',g.overdue,true);
   el('agenda-soon7-section').innerHTML   = _agendaSectionPhone(_uiIcon('bell'),'Cette semaine',g.soon7,false);
   el('agenda-soon30-section').innerHTML  = _agendaSectionPhone(_uiIcon('calendar'),'Ce mois-ci',g.soon30,false);
   let restHtml = _agendaSectionPhone(_uiIcon('list'),'À venir',g.rest,false);
@@ -28158,6 +28378,13 @@ function agendaMarkDone(domEvt, id) {
   domEvt.stopPropagation();
   const e = (DB.agenda||[]).find(x=>x.id===id); if(!e) return;
   e.done = !e.done;
+  // IRL-RATTRAPAGE (v15.780) — rouvrir un rappel IRL fermé automatiquement le marque « rouvert à la main » :
+  // agendaAutoSync ne le refermera pas. Le re-marquer fait rend la main à la fermeture automatique.
+  if (e.cat === 'IRL' && e.auto) {
+    if (!e.done && e.autoDone) { e.autoReopened = true; delete e.autoDone; delete e.autoDoneRaison; }
+    else if (e.done) { delete e.autoReopened; }
+  }
+  if (typeof _stamp === 'function') _stamp(e);
   saveDB();
   rAgenda();
 }

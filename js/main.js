@@ -131,6 +131,7 @@ import { bailSigneComplet, diffModificationsBail, reappliquerJournalBaux, journa
 import { detecterChangementsFinanciers, dateEffetModifDefaut, redaterRevisionIRL, borneMinEffetBareme } from './core/bail-modif.js';
 // IRL-REVISION (R6/R7) — la lettre suit la révision VALIDÉE ; annuler une révision programmée.
 import * as IrlRevision from './core/irl-revision.js';
+import * as IrlRattrapage from './core/irl-rattrapage.js';   // IRL-RATTRAPAGE v15.778 : classer les rappels IRL (agenda qui suit l'état + écran groupé)
 // Retours 15/10 (lot 1, point 4) — ouvrir une pièce jointe sans page blanche (Blob au lieu d'une iframe data:).
 import * as DocOuvrir from './core/doc-ouvrir.js';
 // Retours 15/10 (lot 1, point 5) — « Faire une quittance » ouvre le lot demandé, jamais le 1er lot du filtre d'entité.
@@ -657,6 +658,7 @@ window._bailModifRedaterIRL = redaterRevisionIRL;
 window.DocOuvrir = DocOuvrir;   // ouverture des pièces jointes (PDF / image) par URL blob:
 window.lotQuittanceAOuvrir = lotQuittanceAOuvrir;   // « Faire une quittance » : le lot demandé, jamais le 1er du filtre
 window.IrlRevision = IrlRevision;   // IRL-REVISION : entreeValideeDuCycle / revDepuisEntree / annulerRevisionProgrammee
+window.IrlRattrapage = IrlRattrapage;   // IRL-RATTRAPAGE : etatRappelIrl / trierRattrapage / noteRattrapage / cycleEteint
 window._bailModifBorneMinEffet = borneMinEffetBareme;
 
 // EXPORT-COMPTABLE (Sprint 3E) - FEC + journal + grand livre

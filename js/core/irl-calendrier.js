@@ -519,7 +519,9 @@ export function ganttRevisions(lots, todayISO) {
         }
       } else if (effetYm) {
         if (mm.ym === effetYm) {
-          kind = (e.etat === ETAT.FAITE || e.etat === ETAT.PROGRAMMEE) ? 'faite' : 'effet';
+          // IRL-MOTEUR (v15.776) — une révision « à vérifier » (effet atteint, loyer non à jour) n'est PAS « faite » :
+          // le ruban le dit (jamais une tuile verte « faite » sur une révision qui attend une décision).
+          kind = e.aVerifier ? 'averifier' : ((e.etat === ETAT.FAITE || e.etat === ETAT.PROGRAMMEE) ? 'faite' : 'effet');
           label = '01/' + effetYm.slice(5, 7);
         } else if (mm.ym === rappelYm) { kind = 'rappel'; label = 'rappel'; }
       }
@@ -549,7 +551,7 @@ export function rubanRevisions(gantt) {
   const par = new Map();
   (g.mois || []).forEach((m) => par.set(m.ym, {
     ym: m.ym, mois: m.mois, annee: m.annee, courant: !!m.courant,
-    nbEffet: 0, nbFaite: 0, nbGel: 0, nbRappel: 0, effet: [], faite: [], gel: []
+    nbEffet: 0, nbFaite: 0, nbAVerifier: 0, nbGel: 0, nbRappel: 0, effet: [], faite: [], averifier: [], gel: []
   }));
   for (const l of (g.lignes || [])) {
     for (const c of (l.cells || [])) {
@@ -558,6 +560,7 @@ export function rubanRevisions(gantt) {
       const info = { ref: l.ref, libelle: l.libelle, etat: l.etat, label: c.label };
       if (c.kind === 'effet') { b.nbEffet++; b.effet.push(info); }
       else if (c.kind === 'faite') { b.nbFaite++; b.faite.push(info); }
+      else if (c.kind === 'averifier') { b.nbAVerifier++; b.averifier.push(info); }   // IRL-MOTEUR : à vérifier, pas « faite »
       else if (c.kind === 'gel') { b.nbGel++; b.gel.push(info); }
       else if (c.kind === 'rappel') { b.nbRappel++; }
     }
