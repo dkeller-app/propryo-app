@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.785';
+const IMMOTRACK_VERSION = '15.786';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -7970,7 +7970,7 @@ function _accmShowAregarder(){
       +'.apl-c .pil-mk{display:inline-block;width:15px;height:15px;color:var(--acc);flex:0 0 auto}.apl-c .pil-mk svg{width:100%;height:100%;display:block}'
       +'.apl-z{font-size:13px;color:var(--t3);margin:0 2px 16px}'
       +'</style>'
-      +'<div class="atl"><div class="th"><button class="back" aria-label="Retour" onclick="rAccueil()"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>À regarder</h2></div>'+((typeof _irlRattrapageEntryHtml==='function'&&_irlRattrapageEntryHtml())?('<div class="irlr-ban">'+_irlRattrapageEntryHtml()+'</div>'):'')+pil+rows+'</div>';
+      +'<div class="atl"><div class="th"><button class="back" aria-label="Retour" onclick="rAccueil()"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>À regarder</h2></div>'+pil+rows+'</div>';
   }catch(e){ console.warn('[accmAregarder]', e); }
 }
 // Navigation PROFONDE depuis « À regarder » (téléphone) : chaque famille pointe vers l'écran d'action
@@ -8456,8 +8456,9 @@ function _renderPilotage(ctx) {
   const _enTete = fams.total ? (fams.total + ' à traiter' + (_indispoF.length ? ' · calcul des impayés incomplet' : ''))
     : (_nKoMtx ? (_nKoMtx + ' lot' + (_nKoMtx > 1 ? 's' : '') + ' à mettre en règle')
       : (_indispoF.length ? 'calcul des impayés indisponible' : 'tout est à jour'));
-  const _rattTuile = (typeof _irlRattrapageEntryHtml === 'function') ? _irlRattrapageEntryHtml() : '';
-  bullesEl.innerHTML = (_rattTuile ? '<div class="irlr-ban">' + _rattTuile + '</div>' : '') + '<div class="pil-zt"><b>Ce qui presse</b><i></i><em>' + _enTete + '</em></div>'
+  // Bulle « Révisions IRL à ranger » retirée de l'Accueil (doublon avec la famille Argent/À regarder ;
+  // décision Didier 03/11). L'entrée vers l'écran de rattrapage reste dans l'Agenda (section « En retard »).
+  bullesEl.innerHTML = '<div class="pil-zt"><b>Ce qui presse</b><i></i><em>' + _enTete + '</em></div>'
     + _famZones.map(z => {
         const defs = _famDefs.filter(d => d.zone === z.id);
         const nz = defs.reduce((s, d) => s + (_famById[d.id] ? _famById[d.id].count : 0), 0);
