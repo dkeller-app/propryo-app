@@ -2564,6 +2564,46 @@ textarea.field-modified-since-sig{
 .m-body{padding:22px;max-height:70vh;overflow-y:auto}
 .m-foot{padding:14px 22px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px;background:var(--sur2);border-radius:0 0 var(--rl) var(--rl)}
 
+/* ─────────────────────────────────────────────────────────────
+   ASSISTANT D'AIDE (#ov-assistant) — volet de questions sur l'UTILISATION de l'app.
+   Moteur local/souverain (js/core/assistant-aide.js). Habillage seulement : variables CSS
+   uniquement, aucun hex en dur ; mode sombre hérité des jetons. Mobile-first — les règles
+   génériques @media(max-width:767px) (.modal plein écran 100dvh + .m-foot collant + bottom-nav
+   masquée) font la PAGE pleine M-16. PC/tablette : volet ancré à droite (plus bas, ≥768px).
+   ───────────────────────────────────────────────────────────── */
+#ov-assistant{padding:0}   /* bord à bord : volet plein (desktop) et page pleine M-16 (téléphone) */
+.asa-panel{display:flex;flex-direction:column;overflow:hidden;border-radius:0}
+.asa-head{align-items:center;gap:10px}
+.asa-head .asa-ic{width:30px;height:30px;flex:none;border-radius:9px;background:var(--acc-bg);color:var(--acc);display:grid;place-items:center}
+.asa-head .asa-ic svg{width:18px;height:18px}
+.asa-ht{display:flex;flex-direction:column;min-width:0;flex:1}
+.asa-ht h3{margin:0}
+.asa-sub{font-size:12px;color:var(--t3)}
+.asa-body{flex:1;overflow-y:auto;overscroll-behavior-y:contain;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--sur)}
+.asa-me{align-self:flex-end;max-width:92%;background:var(--acc);color:var(--cta-text);padding:9px 13px;border-radius:14px 14px 4px 14px;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.asa-bot{align-self:flex-start;max-width:94%;background:var(--sur2);border:1px solid var(--bor);border-radius:14px 14px 14px 4px;padding:12px 13px;font-size:14px;line-height:1.5}
+.asa-bot .asa-a{color:var(--t1)}
+.asa-bot .asa-a b{font-weight:800}
+.asa-bot.asa-alert{background:var(--warn-soft);border-color:transparent}
+.asa-src{margin-top:7px;font-size:12px;color:var(--t3)}
+.asa-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.asa-chip{font:inherit;font-size:12.5px;padding:8px 12px;border-radius:var(--rp);background:var(--sur);border:1px solid var(--bor);color:var(--t2);cursor:pointer;min-height:40px}
+.asa-chip:hover{border-color:var(--acc);color:var(--acc)}
+.asa-go{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font:inherit;font-size:13px;font-weight:700;color:var(--acc);background:var(--acc-bg);border:1px solid transparent;padding:8px 12px;border-radius:10px;cursor:pointer;min-height:40px}
+.asa-go svg{width:15px;height:15px;flex:none}
+.asa-foot{align-items:center;gap:8px;justify-content:stretch}
+.asa-foot input{flex:1;min-width:0;font:inherit;font-size:16px;padding:11px 13px;border:1px solid var(--bor);border-radius:11px;background:var(--sur2);color:var(--t1);outline:none;min-height:44px}
+.asa-foot input:focus{border-color:var(--acc)}
+.asa-send{flex:none;background:var(--cta);color:var(--cta-text);border:none;border-radius:11px;padding:0 16px;font:inherit;font-weight:800;cursor:pointer;min-height:44px}
+.asa-note{font-size:11px;color:var(--t3);text-align:center;padding:4px 12px 10px;background:var(--sur)}
+@media (pointer:coarse){ .asa-chip{min-height:44px} }
+/* PC / tablette : VOLET ancré à droite, pleine hauteur (pas une modale centrée). */
+@media (min-width:768px){
+  #ov-assistant{justify-content:flex-end;align-items:stretch;padding:0;background:rgba(0,0,0,.35)}
+  #ov-assistant .asa-panel{width:100%;max-width:420px;height:100vh;max-height:100vh;border-radius:0;border-top:0;border-right:0;border-bottom:0;box-shadow:var(--shadow-lg)}
+  #ov-assistant .asa-foot{border-radius:0}
+}
+
 /* ── TABS ─────────────────────────────────────────────────── */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--bor);margin-bottom:18px}
 .tab{padding:9px 18px;cursor:pointer;color:var(--t2);font-size:13.5px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-weight:500}
