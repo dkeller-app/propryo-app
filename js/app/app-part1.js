@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.787';
+const IMMOTRACK_VERSION = '15.788';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -8448,30 +8448,25 @@ function _renderPilotage(ctx) {
   const _famZones = (typeof window !== 'undefined' && window._PIL_ZONES) ? window._PIL_ZONES
     : [{ id: 'argent', titre: 'Argent' }, { id: 'gestion', titre: 'Gestion locative' }];
   const premierId = (fams.familles && fams.familles[0]) ? fams.familles[0].id : null;
-  // ── La matrice de conformité (toujours rendue). Rendue AVANT le bandeau pour connaître nKo (lots à
-  //    traiter) : Bail/EDL/Caution n'ont PAS de bulle, donc « tout est à jour » ne doit pas s'afficher
-  //    si la matrice a des lots à mettre en règle (audit vitrine). Hosts DOM distincts → ordre libre.
-  let _nKoMtx = 0; try { _nKoMtx = _renderPilMatrice(ctx) || 0; } catch (e) {}
-  const _indispoF = (fams.indisponibles || []);
-  const _enTete = fams.total ? (fams.total + ' à traiter' + (_indispoF.length ? ' · calcul des impayés incomplet' : ''))
-    : (_nKoMtx ? (_nKoMtx + ' lot' + (_nKoMtx > 1 ? 's' : '') + ' à mettre en règle')
-      : (_indispoF.length ? 'calcul des impayés indisponible' : 'tout est à jour'));
-  // Bulle « Révisions IRL à ranger » retirée de l'Accueil (doublon avec la famille Argent/À regarder ;
-  // décision Didier 03/11). L'entrée vers l'écran de rattrapage reste dans l'Agenda (section « En retard »).
-  bullesEl.innerHTML = '<div class="pil-zt"><b>Ce qui presse</b><i></i><em>' + _enTete + '</em></div>'
-    + _famZones.map(z => {
-        const defs = _famDefs.filter(d => d.zone === z.id);
-        const nz = defs.reduce((s, d) => s + (_famById[d.id] ? _famById[d.id].count : 0), 0);
-        return '<div class="pil-zbloc"><div class="pil-zt"><b>' + esc(z.titre) + '</b><i></i><em>'
-          + (nz ? (nz + ' à traiter') : (defs.some(d => _indispoF.indexOf(d.id) >= 0) ? 'calcul indisponible' : 'à jour')) + '</em></div>'
-          + '<div class="pil-bub">' + defs.map(d => {
-              const f = _famById[d.id];
-              // TRAVAUX : QUI PAIE ? — « Incidents à traiter » n'a pas de bulle « à jour » (décision 13/10).
-              if (!f && ((window._PIL_SI_NON_VIDES || []).indexOf(d.id) >= 0)) return '';
-              if (!f && _indispoF.indexOf(d.id) >= 0) return _pilBulleIndispoHtml(d);
-              return f ? _pilBulleHtml(f, f.id === premierId, _indispoF.indexOf(d.id) >= 0) : _pilBulleOkHtml(d);
-            }).join('') + '</div></div>';
-      }).join('');
+  // ── La matrice de conformité « Pilotage du parc » (toujours rendue, désormais pleine largeur).
+  //    Elle couvre les gestes PAR LOT : loyer/impayé, assurance, entretien, révision, mise en location. ──
+  try { _renderPilMatrice(ctx); } catch (e) {}
+  // Lot 2 (audit UX, 04/11) : l'Accueil doit tenir sur un écran. La colonne « Ce qui presse »
+  // doublonnait la matrice (impayé / révision / entretien / assurance / à relouer = DÉJÀ des
+  // colonnes ci-dessus) → retirée ; la matrice passe pleine largeur, inchangée (icônes + détail au
+  // clic, choix Didier 15/10). Restent, en ligne compacte « Aussi à traiter » AU-DESSUS de la
+  // matrice, les SEULES familles sans colonne (_PIL_HORS : régularisations, incidents, dépôts à
+  // restituer, fins de bail) — rien ne disparaît. Plus aucun état « à jour » (KPI = seulement
+  // l'actionnable). La bulle « Révisions IRL à ranger » était déjà retirée (décision Didier 03/11).
+  // Un clic sur une puce réutilise le câblage existant (`data-pilfam` → _pilBulleClick → _pilOpenListe/_dgBulleClick).
+  const _horsIds = (typeof _PIL_HORS !== 'undefined' && _PIL_HORS) ? Object.keys(_PIL_HORS) : ['depot', 'finbail', 'incident', 'regul'];
+  const _aussi = _famDefs.filter(d => _horsIds.indexOf(d.id) >= 0).map(d => _famById[d.id]).filter(f => f && f.count > 0);
+  bullesEl.innerHTML = _aussi.length
+    ? '<div class="pil-aussi"><span class="lg">Aussi à traiter</span>'
+      + _aussi.map(f => '<button type="button" class="pil-ac" data-pilfam="' + esc(f.id) + '">'
+          + '<span class="n">' + f.count + '</span>' + esc(f.lbl) + '</button>').join('')
+      + '</div>'
+    : '';
 }
 
 // Filtre courant du tableau ('tous' | 'ko' | 'vac'), persistant le temps de la session.
