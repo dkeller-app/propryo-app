@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.786';
+const IMMOTRACK_VERSION = '15.787';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -7984,8 +7984,8 @@ function _accmGoto(id, ref, count){
     var setTab = function(t){ if(typeof setLogFicheTab==='function') setTimeout(function(){ try{ setLogFicheTab(t); }catch(e){} },200); };
     var openDepart = function(){ if(ref && typeof _departOuvrir==='function'){ _departOuvrir(ref); return true; } return false; };
     switch(id){
-      case 'impaye':   // impayé d'un lot → sa comptabilité (suivi des loyers), pas la page Loyers globale
-        if(single && hasFiche){ openLogFiche(ref); setTab('compta'); } else go('loyers'); break;
+      case 'impaye':   // impayé → l'onglet Loyers (bloc « Impayés » en tête), jamais la fiche du bien (décision Didier 04/11, audit liaisons)
+        go('loyers'); break;
       case 'depot':    // dépôt à restituer → le solde de tout compte du bail EXACT (17/10) : jamais l'assistant de départ du
                        // locataire suivant (bug téléphone : « Déclarer le départ » du nouveau locataire s'ouvrait)
         _dgBulleClick(); break;
@@ -8749,7 +8749,7 @@ function _pilActionGeste(ref, geste) {
       if (fiche('documents')) setTimeout(() => { try { if (typeof _edlExtForm === 'function') _edlExtForm(true); } catch (e) {} }, 500); else go('edl');
     }
     else if (geste === 'ass') { if (typeof openMrh === 'function') openMrh(null, ref); else go('baux'); }
-    else if (geste === 'loyer') { if (!fiche('compta')) go('loyers'); }
+    else if (geste === 'loyer') { go('loyers'); }   // impayé → l'onglet Loyers (bloc « Impayés » en tête), pas la fiche du bien (décision Didier 04/11, audit liaisons)
     else if (geste === 'entr') { if (!fiche('conformite')) go('equipements'); }
     else if (geste === 'diag') { if (typeof openLogModalOnTab === 'function') openLogModalOnTab(ref, 'diag'); else go('biens'); }
     else if (geste === 'caut') { if (typeof openBail === 'function') openBail(ref); else go('baux'); }   // pièces du bail (lot 2)
