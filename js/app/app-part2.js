@@ -17928,7 +17928,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.788 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.793 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }
@@ -18465,6 +18465,15 @@ async function _handleAttachmentUpload(input, parentType, parentId, parentRef, l
       { type: parentType, id: parentId, ref: parentRef, logRef, category },
       { name: f.name, mime: f.type, size: f.size, dataB64 }
     );
+    // CANDIDAT-FICHE-IA — pré-remplit le TYPE d'une pièce candidat par détection sur le nom de fichier (bulletin /
+    // contrat), haute confiance seulement, pour débloquer la lecture IA sans saisie manuelle. N'écrase jamais un type.
+    if (parentType === 'candidat' && window.VerifPieces && typeof window.VerifPieces.pieceTypeAutoDetecte === 'function') {
+      const _auto = window.VerifPieces.pieceTypeAutoDetecte(doc);
+      if (_auto && window.PiecesCand && window.PiecesCand.typeValide(String(category || ''), _auto)) {
+        doc.pieceType = _auto;
+        try { if (typeof _auditLog === 'function') _auditLog('update', 'attachment', doc.id, 'type détecté automatiquement : ' + (window.PiecesCand.libelleType ? window.PiecesCand.libelleType(_auto) : _auto)); } catch (e) {}
+      }
+    }
     _stamp(doc);
     saveDB();
     showToast('📎 PJ ajoutée : ' + f.name, 'ok', 3000);
@@ -20457,6 +20466,46 @@ function _jpLoadCarteLoyers() {
   return _jpCartePromise;
 }
 
+// TRANCHE 2 — jeux de données TENSION + ENCADREMENT, chargés À LA DEMANDE comme la carte des loyers
+// (cachés ensuite par le SW, 0 CDN). Chargement tolérant : un fichier indisponible n'empêche pas les
+// autres signaux ni l'estimation tranche 1.
+let _jpTensData = null, _jpTensPromise = null;
+function _jpLoadJson(path) {
+  return fetch(path, { headers: { 'Accept': 'application/json' } })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .catch(() => null);
+}
+function _jpLoadTension() {
+  if (_jpTensData) return Promise.resolve(_jpTensData);
+  if (_jpTensPromise) return _jpTensPromise;
+  _jpTensPromise = Promise.all([
+    _jpLoadJson('js/data/zonage-abc-2026.json'),
+    _jpLoadJson('js/data/zone-tendue-2025.json'),
+    _jpLoadJson('js/data/encadrement-communes.json'),
+    _jpLoadJson('js/data/oll-loyers.json')   // TRANCHE 3 : loyers pratiqués (Observatoires Locaux des Loyers)
+  ]).then(([zonage, tlv, encadrement, oll]) => {
+    _jpTensData = { zonage, tlv, encadrement, oll };
+    return _jpTensData;
+  }).catch(() => { _jpTensPromise = null; return { zonage: null, tlv: null, encadrement: null, oll: null }; });
+  return _jpTensPromise;
+}
+
+/** Résout tension + encadrement pour un code INSEE fiable (null si module ou jeux indisponibles). */
+function _jpResoudreTension(insee, tz) {
+  const JP = window.JustePrix;
+  if (!JP || !tz) return { tension: null, encadrement: null };
+  let tension = null, encadrement = null;
+  try {
+    if (tz.zonage) {
+      const zoneABC = JP.zoneABCDeCommune(insee, tz.zonage);
+      const tlv = tz.tlv ? JP.tlvDeCommune(insee, tz.tlv) : 0;
+      tension = JP.tensionDeCommune({ zoneABC, tlv });
+    }
+    if (tz.encadrement) encadrement = JP.encadrementDeCommune(insee, tz.encadrement);
+  } catch (e) { /* noop : la tension est un bonus, jamais bloquant */ }
+  return { tension, encadrement };
+}
+
 /** Géocode une adresse via la BAN (réutilise GeorisquesErpDetector + _erpFetchJson retry/backoff) → {insee, city, score, …} ou null. */
 function _jpGeocodeInsee(address) {
   const G = window.GeorisquesErpDetector;
@@ -20479,8 +20528,72 @@ const _JP_SVG = {
   chev: '<svg class="jp-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
   book: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
   edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
-  refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-8 5"/><path d="M3 3v5h5"/></svg>'
+  refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-8 5"/><path d="M3 3v5h5"/></svg>',
+  trend: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>',
+  scale: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/><path d="M8 21h8"/></svg>',
+  layers: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>'
 };
+
+/** Bandeau « sources recoupées » (annonces ANIL + loyers pratiqués OLL quand un observatoire couvre la commune). */
+function _jpSourcesHtml(res) {
+  const rc = res.recoupement || { sources: ['anil'] };
+  const oll = res.oll;
+  const hasOll = oll && rc.sources && rc.sources.indexOf('oll') >= 0;
+  const chips = [`<span class="jp-chip jp-chip-anil" title="Loyers d'annonce, charges comprises (Carte des loyers ANIL)">Annonces · Carte des loyers</span>`];
+  if (hasOll) {
+    const yr = oll.millesime ? (' ' + oll.millesime) : '';
+    const nobs = oll.nobs ? (' · ' + Math.round(oll.nobs).toLocaleString('fr-FR') + ' relevés') : '';
+    chips.push(`<span class="jp-chip jp-chip-oll" title="Loyers réellement pratiqués, hors charges, médiane (Observatoire local des loyers)">Loyers pratiqués · Observatoire ${escHtml(oll.nom)}${yr}${nobs}</span>`);
+  }
+  return `<div class="jp-sources"><span class="jp-src-ic">${_JP_SVG.layers}</span><span class="jp-src-lbl">${hasOll ? 'Deux sources recoupées' : 'Source'} :</span>${chips.join('')}</div>`;
+}
+
+/** Badge d'avertissement quand le recoupement lève un drapeau (petite surface fragile / sources divergentes). */
+function _jpRecoupBadgeHtml(res) {
+  const rc = res.recoupement;
+  if (!rc || !rc.flags || !rc.flags.length) return '';
+  let msg = '';
+  if (rc.flags.indexOf('anil-petite-surface') >= 0) {
+    msg = `<b>Estimation fragile — petite surface.</b> Le loyer d'annonce de référence paraît élevé au regard des logements plus grands de la commune (prime fréquente des petites surfaces en annonce). La fourchette est élargie : à affiner selon l'état réel du bien.`;
+  } else if (rc.flags.indexOf('sources-divergentes') >= 0) {
+    msg = `<b>Sources divergentes.</b> Les loyers d'annonce et les loyers réellement pratiqués s'écartent nettement sur cette commune. La fourchette est élargie plutôt que de livrer un chiffre faussement précis.`;
+  }
+  if (!msg) return '';
+  return `<div class="jp-alert jp-adv"><span class="jp-ai">${_JP_SVG.trend}</span><div>${msg}</div></div>`;
+}
+
+/** Ligne de tension du marché (badge niveau + conseil de lecture). Vide si tension non déterminée. */
+function _jpTensionHtml(res) {
+  const t = res && res.tension;
+  if (!t || t.niveau === 'inconnu') return '';
+  const cls = { 'tres-tendu': 'jp-t-tres', 'tendu': 'jp-t-tendu', 'modere': 'jp-t-modere', 'detendu': 'jp-t-detendu' }[t.cle] || 'jp-t-modere';
+  const zoneLbl = t.zoneABC ? ('Zone ' + escHtml(t.zoneABC)) : '';
+  const tenduLbl = t.zoneTendue ? ' · zone tendue' : (t.touristiqueTendue ? ' · zone touristique et tendue' : '');
+  const conseil = t.conseil ? (' → ' + escHtml(t.conseil)) : '';
+  return `
+    <div class="jp-tens ${cls}">
+      <span class="jp-tens-ic">${_JP_SVG.trend}</span>
+      <div><b>${zoneLbl ? zoneLbl + ' · ' : ''}${escHtml(t.label)}</b>${escHtml(tenduLbl)}<span class="jp-tens-c">${conseil}</span></div>
+    </div>`;
+}
+
+/** Bloc encadrement des loyers (plafonnement). Jamais de plafond chiffré : renvoi au simulateur officiel. */
+function _jpEncadrementHtml(res) {
+  const e = res && res.encadrement;
+  if (!e || !e.applicable) return '';
+  const nom = escHtml(e.nom || 'cette commune');
+  const depuis = e.depuis ? (' depuis le ' + fd(e.depuis)) : '';
+  const partiel = e.couverture === 'partielle'
+    ? ` <b>Seule une partie de la commune est encadrée</b> : vérifier à l'adresse exacte du bien.` : '';
+  const lien = e.simulateur
+    ? `<a class="jp-link" href="${escHtml(e.simulateur)}" target="_blank" rel="noopener">Vérifier le plafond exact sur le simulateur officiel</a>` : '';
+  return `
+    <div class="jp-alert jp-ora">
+      <span class="jp-ai">${_JP_SVG.scale}</span>
+      <div><b>Encadrement des loyers en vigueur à ${nom}${depuis}.</b> Le loyer est plafonné au <b>loyer de référence majoré</b> du secteur (en €/m², selon le quartier, l'époque de construction, le nombre de pièces et le caractère meublé). Ce plafond est un montant légal qui dépend de l'adresse précise : il n'est pas reproduit ici.${partiel}
+      <span class="jp-law">La fourchette ci-dessus est une estimation de marché, pas le plafond légal. ${lien}</span></div>
+    </div>`;
+}
 
 /** Panneau « Juste prix » (teaser + bouton d'estimation à la demande). */
 function _renderLogFicheJustePrix(log, bail, ref) {
@@ -20519,8 +20632,9 @@ async function _jpEstimer(ref) {
   const input = _jpBuildInput(log, bail, ref);
   body.innerHTML = `<div class="jp-muted">Estimation en cours… (lecture des données publiques)</div>`;
   try {
-    const [data, ban] = await Promise.all([_jpLoadCarteLoyers(), _jpGeocodeInsee(input.address)]);
+    const [data, tz, ban] = await Promise.all([_jpLoadCarteLoyers(), _jpLoadTension(), _jpGeocodeInsee(input.address)]);
     // Score BAN insuffisant → on ne rattache PAS à une commune incertaine (éviter un chiffre faux en silence).
+    // Garde-fou tranche 2 : sans commune certaine, NI tension NI encadrement ne sont affichés.
     if (!_jpGeoFiable(ban)) {
       body.innerHTML = `<div class="jp-muted">Adresse non localisée avec certitude : le bien ne peut pas être rattaché à une commune fiable. Préciser l'adresse du bien pour obtenir une estimation.</div>${_jpRetryBtn(ref)}`;
       return;
@@ -20528,7 +20642,17 @@ async function _jpEstimer(ref) {
     const rec = (data.communes || {})[ban.insee] || null;
     input.insee = ban.insee;
     input.commune = ban.city || (rec && rec.n) || '';
-    const res = window.JustePrix.evaluer(input, rec, { meta: data.meta, dateRef: new Date().toISOString().slice(0, 10) });
+    const { tension, encadrement } = _jpResoudreTension(ban.insee, tz);
+    // TRANCHE 3 : ancre OLL (loyer pratiqué HC) sur le segment du bien, si un observatoire couvre la commune.
+    let oll = null;
+    try {
+      const JP = window.JustePrix;
+      if (JP && tz && tz.oll) {
+        const seg = JP.choisirSegment({ maison: input.maison, nbPieces: input.nbPieces, surf: input.surf });
+        oll = JP.ollReference(ban.insee, seg, tz.oll);
+      }
+    } catch (e) { /* noop : l'OLL est un recoupement, jamais bloquant */ }
+    const res = window.JustePrix.evaluer(input, rec, { meta: data.meta, ollMeta: (tz && tz.oll && tz.oll.meta) || null, dateRef: new Date().toISOString().slice(0, 10), tension, encadrement, oll });
     body.innerHTML = _jpRenderResult(res, { ban, ref, meuble: input.meuble });
   } catch (e) {
     console.warn('[juste-prix]', e);
@@ -20593,12 +20717,19 @@ function _jpRenderResult(res, ctx) {
       <div class="jp-val">${fmtN(f.basse)}&nbsp;–&nbsp;${fmtN(f.haute)}&nbsp;<small>€ HC / mois</small></div>
       <div class="jp-sub">Milieu de fourchette : <b>${fmt(res.hcCentral)}</b>${res.euroM2HC ? ' · soit ≈ ' + (+res.euroM2HC).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' €/m² hors charges' : ''}</div>
     </div>
+    ${_jpTensionHtml(res)}
     <div class="jp-gauge">
       <div class="jp-track"><span class="jp-band" style="left:${pos(f.basse).toFixed(1)}%;right:${(100 - pos(f.haute)).toFixed(1)}%"></span><span class="jp-mid" style="left:${pos(res.hcCentral).toFixed(1)}%"></span>${curHtml}</div>
       <div class="jp-scale"><span>${fmt(f.basse)}</span><span>${fmt(res.hcCentral)}</span><span>${fmt(f.haute)}</span></div>
     </div>
-    <p class="jp-note">Repère issu d'annonces du secteur. À ajuster selon l'état réel du bien et la saison.</p>
-    ${ctx.meuble ? `<p class="jp-note" style="text-align:left">Estimation basée sur le <b>non-meublé</b> (nature de la Carte des loyers) : un logement meublé se loue en général un peu plus cher.</p>` : ''}
+    ${_jpSourcesHtml(res)}
+    ${_jpRecoupBadgeHtml(res)}
+    <p class="jp-note">${(res.oll && res.recoupement && res.recoupement.sources.indexOf('oll') >= 0)
+      ? `Repère recoupant les annonces du secteur et les loyers réellement pratiqués (observatoire local).`
+      : `Repère issu des annonces du secteur. Aucun relevé d'observatoire local disponible sur cette commune.`} À ajuster selon l'état réel du bien et la saison.</p>
+    <p class="jp-note jp-ref">Fourchette de <b>référence</b> de marché (médiane). Un logement avec des atouts — extérieur, parking ou stationnement, rénovation récente, étage élevé — peut se situer <b>au-dessus du haut</b> ; un bien dégradé, plutôt en dessous.</p>
+    ${ctx.meuble ? `<p class="jp-note" style="text-align:left">Estimation basée sur le <b>non-meublé</b> (nature des références) : un logement meublé se loue en général un peu plus cher.</p>` : ''}
+    ${_jpEncadrementHtml(res)}
 
     <details class="jp-details">
       <summary>${_JP_SVG.info} Voir le détail du calcul ${_JP_SVG.chev}</summary>
@@ -20607,11 +20738,15 @@ function _jpRenderResult(res, ctx) {
           <div class="jp-row"><span class="jp-k">Carte des loyers — ${commune}${commune ? ', ' : ''}${segLbl}</span><span class="jp-v">${(+res.euroM2CC).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} €/m²<small> charges comprises</small></span></div>
           <div class="jp-row"><span class="jp-k">× surface habitable</span><span class="jp-v">${fmt(res.loyerCC)}<small> CC</small></span></div>
           <div class="jp-row"><span class="jp-k">− provision de charges estimée</span><span class="jp-v">− ${fmt(prov.montant)}</span></div>
-          <div class="jp-row jp-sum"><span class="jp-k"><b>Loyer hors charges de référence</b></span><span class="jp-v">≈ ${fmt(res.hcCentral)}</span></div>
+          ${(res.oll && res.recoupement && res.recoupement.sources.indexOf('oll') >= 0)
+            ? `<div class="jp-row"><span class="jp-k">Loyer pratiqué médian — observatoire de ${escHtml(res.oll.nom)}</span><span class="jp-v">${(+res.oll.euroM2HC).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} €/m²<small> hors charges</small></span></div>` : ''}
+          <div class="jp-row jp-sum"><span class="jp-k"><b>Loyer hors charges de référence${(res.oll && res.recoupement && res.recoupement.sources.indexOf('oll') >= 0) ? ' (recoupé)' : ''}</b></span><span class="jp-v">≈ ${fmt(res.hcCentral)}</span></div>
           <div class="jp-row"><span class="jp-k">Fourchette (fiabilité de la commune : ${escHtml(res.fiabilite.label)})</span><span class="jp-v">${fmt(f.basse)} – ${fmt(f.haute)}</span></div>
         </div>
-        <p>La Carte des loyers donne un loyer <b>charges comprises</b>. Pour obtenir un loyer <b>hors charges</b>, la provision estimée est retranchée. La largeur de la fourchette (± ${Math.round(f.width * 100)} %) reflète la fiabilité de la donnée sur la commune (prédiction au niveau ${escHtml(res.fiabilite.typLabel)}).</p>
+        <p>La Carte des loyers donne un loyer <b>charges comprises</b> (annonces) ; la provision estimée est retranchée pour obtenir un loyer <b>hors charges</b>.${(res.oll && res.recoupement && res.recoupement.sources.indexOf('oll') >= 0) ? ` L'observatoire local fournit, lui, un loyer <b>réellement pratiqué</b> déjà hors charges : les deux sources sont recoupées (l'annonce borne le haut, le pratiqué ancre le bas).` : ''} La largeur de la fourchette (± ${Math.round(f.width * 100)} %) reflète la fiabilité de la donnée sur la commune (prédiction ANIL au niveau ${escHtml(res.fiabilite.typLabel)})${(res.recoupement && res.recoupement.flags && res.recoupement.flags.length) ? `, élargie car ${res.recoupement.flags.indexOf('anil-petite-surface') >= 0 ? 'l\'indicateur petite surface est jugé fragile' : 'les sources divergent'}` : ''}.</p>
         <div class="jp-src">${_JP_SVG.book}<span>Source : « Carte des loyers » 2025 — ${escHtml(srcAttr)} (data.gouv.fr, Licence Ouverte v2). Caractéristiques lues dans la fiche du bien (surface, type, commune).</span></div>
+        ${(res.oll && res.recoupement && res.recoupement.sources.indexOf('oll') >= 0) ? `<div class="jp-src">${_JP_SVG.book}<span>Loyers pratiqués : « Résultats des observatoires locaux des loyers par agglomération »${res.oll.millesime ? ' — niveau au 01/01/' + res.oll.millesime : ''} (réseau des Observatoires Locaux des Loyers / ANIL, contrôle scientifique Comité scientifique de l'observation des loyers ; data.gouv.fr, Licence Ouverte v2). Loyer mensuel hors charges médian, loyers réellement pratiqués (≠ annonces).</span></div>` : ''}
+        ${(res.tension && res.tension.niveau !== 'inconnu') ? `<div class="jp-src">${_JP_SVG.book}<span>Tension : zonage A/B/C (DHUP, en vigueur 26/06/2026) et zone tendue (taxe sur les logements vacants, décret du 22/12/2025) — data.gouv.fr, Licence Ouverte v2. La fourchette n'est pas recalculée : la tension oriente seulement la lecture.</span></div>` : ''}
       </div>
     </details>
 

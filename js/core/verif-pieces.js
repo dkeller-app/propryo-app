@@ -412,3 +412,43 @@ export function typeLectureIa(doc) {
   if (TYPES_CONTRAT.includes(t)) return 'contrat';
   return null;
 }
+
+// ── CANDIDAT-FICHE-IA : auto-détection du TYPE d'une pièce candidat depuis le NOM de fichier (haute confiance) ───────
+// But : débloquer la lecture IA (et le bon classement) sans saisie manuelle quand le fichier s'appelle « Bulletin de
+// paie …pdf » ou « Contrat …pdf » — `typeLectureIa` ne lit que `pieceType`, resté « non précisé » sur un dépôt réel.
+// PUR, testé. Jamais d'écrasement d'un type choisi ; au moindre doute (nom ambigu) → '' (reste « non précisé »).
+const _normNom = (s) => String(s == null ? '' : s)
+  .replace(/\.[a-z0-9]{2,5}$/i, '')                                    // extension (.pdf, .jpeg…)
+  .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .replace(/[’'`´_\-.,;:!?()[\]{}"«»/\\]+/g, ' ').replace(/\s+/g, ' ').trim();
+// Mots entiers. Bulletin : bulletin / fiche de paie / paie / paye / salaire / payslip. Contrat : contrat / CDI / CDD / embauche.
+const _RE_BULLETIN = /\b(?:bulletins?|fiches?)\s+(?:de\s+)?(?:paie|paye|salaires?)\b|\bbulletins?\b|\b(?:paie|paye)\b|\bsalaires?\b|\bpayslips?\b/;
+const _RE_CONTRAT = /\bcontrats?\b|\bcdi\b|\bcdd\b|\bembauche\b/;
+/** Genre lu sur le nom de fichier : 'bulletin', 'contrat' ou null. Null si rien, ou si le nom évoque les DEUX. */
+export function detecterGenrePiece(nomFichier) {
+  const n = _normNom(nomFichier);
+  if (!n) return null;
+  const b = _RE_BULLETIN.test(n), c = _RE_CONTRAT.test(n);
+  if (b === c) return null;                                            // les deux, ou aucun → on ne tranche pas
+  return b ? 'bulletin' : 'contrat';
+}
+// Genre → type de pièce (valeur exacte de TYPES_BULLETIN/TYPES_CONTRAT) selon la ZONE de dépôt de la pièce candidat.
+const _TYPE_AUTO = Object.freeze({
+  bulletin: { ressources: 'I.D.2', garant: 'II.E.3' },
+  contrat: { situation: 'I.C.1', garant: 'II.D.1' }
+});
+/** Type (clé de pieceType) détecté pour une pièce candidat d'une catégorie donnée. '' si le nom est ambigu, ou si le
+ *  genre détecté n'a pas de type dans cette catégorie (ex. « contrat » déposé dans « ressources »). `mime` réservé. */
+export function detecterPieceType(nomFichier, categorie, mime) {
+  const g = detecterGenrePiece(nomFichier);
+  if (!g) return '';
+  const m = _TYPE_AUTO[g];
+  return (m && m[String(categorie || '')]) || '';
+}
+/** Type À APPLIQUER à une pièce candidat : la détection, SEULEMENT si aucun type n'est déjà renseigné (jamais
+ *  d'écrasement d'un choix manuel). '' = ne rien changer. Accepte une pièce {nom|originalName|name, categorie|category, mime}. */
+export function pieceTypeAutoDetecte(piece) {
+  const p = piece || {};
+  if (String(p.pieceType || '')) return '';
+  return detecterPieceType(p.nom != null ? p.nom : (p.originalName || p.name), p.categorie != null ? p.categorie : p.category, p.mime);
+}

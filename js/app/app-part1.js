@@ -1,7 +1,7 @@
 
 // v15.81 — Constante version centralisée (évite désync title/footer/sidebarV4).
 // À bumper UNIQUEMENT ici + dans <title> + <em> footer legacy au boot.
-const IMMOTRACK_VERSION = '15.788';
+const IMMOTRACK_VERSION = '15.793';
 
 // Sync runtime du footer sidebar legacy (l'élément <em>v15.498</em> statique
 // dans le HTML sera écrasé au boot si la constante diffère).
@@ -14925,15 +14925,21 @@ function _candIaAnalyse(c){
   return out;
 }
 function _candIaAFaire(c){ return _candIaPieces(c).filter(d => !d.verifIa || d.verifIa.erreur); }
+// CANDIDAT-FICHE-IA — indice discret quand la lecture IA est activée et le service ouvert, mais qu'aucune pièce n'est
+// éligible (dossier sans bulletin typé) : la fonction reste visible et dit comment l'utiliser. Ton neutre, non bloquant.
+function _candIaIndiceHtml(){
+  return '<div class="cand-ia-indice">' + _uiIcon('sparkle', 15) + '<span><b>Lecture par l\'IA activée</b> — ajouter (ou préciser le type d\') un bulletin de salaire pour l\'utiliser. Rien n\'est envoyé sans un clic.</span></div>';
+}
 function _candIaLotHtml(c){
   const R = _candVerifReglages();
   if(!R.ia || !c || c.statut === 'refuse' || c.statut === 'converti') return '';
-  const a = _candIaAFaire(c); if(!a.length) return '';
   if(_candIaOcr.actif === null || Date.now() - _candIaOcr.le > 600000){
     _candIaDispo().then(ok => { try{ if(ok && el('ov-fiche-candidat') && !el('ov-fiche-candidat').classList.contains('hidden') && _ficheCandidatOuverte === c.id) openFicheCandidat(c.id); }catch(e){} }).catch(() => {});
     return '';
   }
   if(!_candIaOcr.actif) return '';
+  if(!_candIaPieces(c).length) return _candIaIndiceHtml();   // service ouvert mais aucune pièce éligible → indice UX
+  const a = _candIaAFaire(c); if(!a.length) return '';        // pièces éligibles toutes déjà lues → rien
   const nb = a.filter(d => window.VerifPieces.typeLectureIa(d) === 'bulletin').length, nc = a.length - nb;
   const quoi = [nb ? nb + ' bulletin' + (nb > 1 ? 's' : '') + ' de salaire' : '', nc ? 'la première page du contrat de travail' : ''].filter(Boolean).join(' et ');
   return '<div class="cand-ia-lot">' + _uiIcon('sparkle', 16) + '<div class="tx"><b>Lecture par l\'IA</b> : ' + escHtml(quoi) + ' peuvent être lus pour vérifier les calculs, les cumuls, l\'employeur et la date d\'entrée. Rien n\'est envoyé sans ce clic.</div>'
@@ -15526,11 +15532,31 @@ function _candEmployeurSousLigneHtml(c){
   return '<div class="cand-siren">' + (ident.type === 'siret' ? 'SIRET ' : 'SIREN ') + escHtml(ident.valeur) + '</div><div class="cand-supp">' + escHtml(st) + '</div>';
 }
 let _ficheCandidatOuverte = null;
+// CANDIDAT-FICHE-IA — migration douce, NON DESTRUCTIVE : pré-type les pièces candidat « non précisées » dont le nom de
+// fichier est sans ambiguïté (bulletin / contrat), pour débloquer la lecture IA d'un dossier déjà déposé sans saisie
+// manuelle. Ne touche que les pièces sans type (jamais d'écrasement) ; idempotente (rien à faire au 2e passage) ; un
+// seul saveDB ; tracée à l'audit ; sautée en lecture seule (aucune écriture possible).
+function _candAutoTypePieces(c){
+  const VP = window.VerifPieces;
+  if(!c || (typeof _appReadOnly !== 'undefined' && _appReadOnly) || !VP || typeof VP.pieceTypeAutoDetecte !== 'function' || !window.PiecesCand) return;
+  let change = false;
+  (DB.documents||[]).forEach(d => {
+    if(!d || d._deleted || d.parentType !== 'candidat' || String(d.parentId) !== String(c.id)) return;
+    if(String(d.pieceType || '')) return;                               // type déjà présent : jamais écrasé
+    const t = VP.pieceTypeAutoDetecte(d);
+    if(t && window.PiecesCand.typeValide(String(d.category || ''), t)){
+      d.pieceType = t; _stamp(d); change = true;
+      try{ if(typeof _auditLog === 'function') _auditLog('update', 'attachment', d.id, 'type détecté automatiquement : ' + (window.PiecesCand.libelleType ? window.PiecesCand.libelleType(t) : t)); }catch(e){}
+    }
+  });
+  if(change) saveDB();
+}
 function openFicheCandidat(id){
   const c = (DB.candidats||[]).find(x=>x && x.id===id && !x._deleted);
   const body = el('fiche-cand-body');
   if(!c || !body){ showToast('Candidat introuvable','err'); return; }
   _ficheCandidatOuverte = id;
+  try{ _candAutoTypePieces(c); }catch(e){}   // CANDIDAT-FICHE-IA : type auto des pièces non précisées (noms sans ambiguïté)
   try{ if(window.Employeur && window.Employeur.doitVerifier(c)) setTimeout(() => { _candVerifierEmployeur(id).catch(()=>{}); }, 0); }catch(e){}
   try{ setTimeout(() => { _candVerifierPieces(id).catch(()=>{}); }, 0); }catch(e){}   // VERIF-DOCUMENTS : pièces non encore vérifiées (sur l'appareil)
   if(c.vu === false){ c.vu = true; _stamp(c); saveDB(); try{ _renderInboxSurfaces(); }catch(e){} try{ if(typeof rCandidats==='function') rCandidats(); }catch(e){} } // re-render liste → la pastille « Nouveau » de la ligne disparaît
@@ -15712,7 +15738,6 @@ function openFicheCandidat(id){
           <div class="k">Adresse précédente</div><div class="v">${escHtml(c.adressePrecedente||'—')}</div>
         </div>
       </div>
-      <div class="fc-sub-stack">
       <div class="card">
         <div class="ct" style="margin-top:0">Situation</div>
         <div class="kv-grid">
@@ -15726,7 +15751,6 @@ function openFicheCandidat(id){
       <div class="card">
         <div class="ct" style="margin-top:0">Garant</div>
         ${garantHtml}
-      </div>
       </div>
     </div>
       <div class="card">

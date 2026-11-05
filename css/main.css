@@ -9552,6 +9552,10 @@ span.cand-vbdg{cursor:default}
 .cand-ia-lot svg{flex:0 0 auto;margin-top:2px;color:var(--t2)}
 .cand-ia-lot .tx{flex:1;min-width:220px;font-size:12.5px;color:var(--t2);line-height:1.45}
 .cand-ia-lot .tx b{color:var(--t1)}
+/* CANDIDAT-FICHE-IA : indice discret quand l'IA est activée mais aucune pièce n'est éligible (non bloquant, ton neutre). */
+.cand-ia-indice{display:flex;gap:9px;align-items:flex-start;border:1px dashed var(--bor);background:transparent;border-radius:10px;padding:9px 12px;margin-top:10px;font-size:12.5px;color:var(--t2);line-height:1.45}
+.cand-ia-indice svg{flex:0 0 auto;margin-top:1px;color:var(--t3)}
+.cand-ia-indice b{color:var(--t1)}
 .cand-ia-envoi{display:flex;flex-direction:column;gap:6px}
 .cand-ia-envoi .it{display:flex;gap:9px;align-items:center;padding:8px 10px;border:1px solid var(--bor);border-radius:var(--r);background:var(--sur2);font-size:12.5px;color:var(--t1)}
 .cand-ia-envoi .it svg{color:var(--t2);flex:0 0 auto}
@@ -11510,7 +11514,32 @@ body[data-dash-v4="on"] .v4s-gest2-pill.warn{background:#fef3c7;color:#92400e}
 .jp-alert .jp-law{display:block;font-size:11.5px;color:var(--t3);margin-top:4px}
 .jp-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
 .jp-muted{font-size:12.5px;color:var(--t3)}
+.jp-link{color:var(--acc);font-weight:700;text-decoration:underline}
+/* TRANCHE 2 — ligne de tension du marché (badge niveau + conseil de lecture) */
+.jp-tens{display:flex;align-items:flex-start;gap:9px;margin:10px auto 0;max-width:440px;padding:9px 12px;border-radius:var(--r);font-size:12.5px;line-height:1.45;text-align:left;border:1px solid var(--bor2)}
+.jp-tens .jp-tens-ic{flex:none;margin-top:1px}
+.jp-tens b{color:var(--t1)}
+.jp-tens .jp-tens-c{color:var(--t2)}
+.jp-tens.jp-t-tres{background:var(--ora-bg);border-color:color-mix(in srgb,var(--ora) 32%,transparent)}
+.jp-tens.jp-t-tres .jp-tens-ic{color:var(--ora)}
+.jp-tens.jp-t-tendu{background:var(--ora-bg);border-color:color-mix(in srgb,var(--ora) 24%,transparent)}
+.jp-tens.jp-t-tendu .jp-tens-ic{color:var(--ora)}
+.jp-tens.jp-t-modere{background:var(--adv-bg);border-color:color-mix(in srgb,var(--adv) 28%,transparent)}
+.jp-tens.jp-t-modere .jp-tens-ic{color:var(--adv)}
+.jp-tens.jp-t-detendu{background:var(--sur2);border-color:var(--bor2)}
+.jp-tens.jp-t-detendu .jp-tens-ic{color:var(--t3)}
+/* TRANCHE 3 — bandeau « sources recoupées » (annonces ANIL + loyers pratiqués OLL) + mention de référence */
+.jp-sources{display:flex;flex-wrap:wrap;align-items:center;gap:7px;max-width:440px;margin:12px auto 0;font-size:11.5px;color:var(--t3)}
+.jp-sources .jp-src-ic{color:var(--acc);flex:none;display:inline-flex}
+.jp-sources .jp-src-lbl{font-weight:700;color:var(--t2)}
+.jp-chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:var(--rp);font-size:11px;font-weight:700;line-height:1.3;border:1px solid var(--bor2)}
+.jp-chip-anil{background:var(--sur2);color:var(--t2)}
+.jp-chip-oll{background:var(--grn-bg);color:var(--grn);border-color:color-mix(in srgb,var(--grn) 28%,transparent)}
+.jp-note.jp-ref{color:var(--t2);background:var(--sur2);border:1px solid var(--bor2);border-radius:var(--r);padding:9px 12px;margin-top:10px;text-align:left;line-height:1.5}
+.jp-note.jp-ref b{color:var(--t1)}
 @media (max-width:480px){
   .jp-range .jp-val{font-size:30px}
   .jp-acts .btn{width:100%}
+  .jp-tens{max-width:none}
+  .jp-sources{max-width:none}
 }
