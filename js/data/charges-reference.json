@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "jeu": "Barème de référence des charges récupérables — estimation à la première mise en location",
+    "objet": "Aider le propriétaire à fixer une provision de charges récupérables quand il n'a aucune donnée : combien ET pourquoi, poste par poste, avec l'assiette (ce qui pilote le montant) et la source de chaque coefficient.",
+    "producteur": "Propryo — barème interne construit à partir de données publiques",
+    "millesime": 2026,
+    "revise": "2026-11-05",
+    "fondementJuridique": "art. 10 loi n° 65-557 du 10/07/1965 (répartition en copropriété) ; décret n° 87-713 du 26/08/1987 (liste limitative des charges récupérables) ; art. 23 loi n° 89-462 du 06/07/1989 (régularisation annuelle ; TEOM récupérable à 100 %).",
+    "avertissement": "GARDE-FOU : un seul coefficient est un CHIFFRE FERME SOURCÉ — le prix de l'eau (SISPEA). Tous les autres sont des ORDRES DE GRANDEUR raisonnés (sourceType = 'ordre-de-grandeur'), dérivés de ratios publics d'observatoires de charges ou de moyennes nationales ; ils ne doivent JAMAIS être présentés comme des montants fermes. Toute provision estimée se régularise chaque année sur les charges réelles (art. 23 loi 1989).",
+    "methode": "Les coefficients €/m²/mois (charges générales), €/occupant/mois (eau) et le forfait annuel d'immeuble ÷ nombre de logements (ascenseur, gardien) reproduisent le modèle validé par assiette. Ils surchargent les valeurs par défaut du module js/core/juste-prix.js (CHARGES_POSTES / EAU_DEFAUT). La logique d'applicabilité (quels postes selon appartement/maison, chauffage/eau collectifs, équipements) reste dans le code, testée.",
+    "sources": [
+      {
+        "id": "sispea2025",
+        "type": "sourcé",
+        "producteur": "Office français de la biodiversité (OFB) / eaufrance",
+        "jeu": "Observatoire national des services d'eau et d'assainissement (SISPEA) — rapport 2025, données 2023",
+        "url": "https://www.ofb.gouv.fr/sites/default/files/Fichiers/Presse/CP_SISPEA_2025_VF.pdf",
+        "licence": "données publiques",
+        "chiffres": "prix moyen 4,69 €/m³ TTC (consommation de référence) ; consommation domestique ≈ 53 m³/personne/an"
+      },
+      {
+        "id": "arc",
+        "type": "référence partielle (totaux, part récupérable non isolée)",
+        "producteur": "ARC — Association des Responsables de Copropriété ; Fédération des ascenseurs",
+        "jeu": "Ratios de charges par m² habitable/an (dossier 2019) et coûts d'ascenseur par lot",
+        "url": "https://arc-copro.fr/",
+        "licence": "publication ARC",
+        "chiffres": "entretien ≈ 7,1 €/m²/an, chauffage ≈ 14,6 €/m²/an, gardiennage ≈ 10,2 €/m²/an (TOTAUX 2019, dont une part seulement est récupérable) ; ascenseur ≈ 180 €/lot/an (≈ 0,50 €/jour/appartement)"
+      },
+      {
+        "id": "teom",
+        "type": "moyenne nationale",
+        "producteur": "DGCL / DGFiP",
+        "jeu": "Taxe d'enlèvement des ordures ménagères (TEOM)",
+        "url": "https://www.collectivites-locales.gouv.fr/",
+        "licence": "données publiques",
+        "chiffres": "taux moyen ≈ 9,5 % de la base ; ordre de grandeur ≈ 144 €/habitant/an. Assise sur la valeur locative cadastrale (≈ surface + standing), récupérable à 100 %. Non affinée par commune à ce stade (le code INSEE est connu : affinage prévu)."
+      }
+    ]
+  },
+  "eau": {
+    "prixM3": 4.69,
+    "m3ParPersonneAn": 53,
+    "source": "sispea2025"
+  },
+  "postes": {
+    "entretien": { "assiette": "m2", "perM2Mois": 0.35, "sourceType": "ordre-de-grandeur", "source": "Ordre de grandeur · ratios d'observatoires de charges (ARC) · décret 87-713", "sourceId": "arc" },
+    "verts": { "assiette": "m2", "perM2Mois": 0.08, "sourceType": "ordre-de-grandeur", "source": "Ordre de grandeur · décret 87-713 · loi 1965 art. 10", "sourceId": "arc" },
+    "gardien": { "assiette": "forfait", "forfaitAn": 18000, "sourceType": "ordre-de-grandeur", "source": "Ordre de grandeur · part récupérable 75 % · décret 87-713", "sourceId": "arc" },
+    "ascenseur": { "assiette": "forfait", "forfaitAn": 2200, "sourceType": "ordre-de-grandeur", "source": "Ordre de grandeur · ~180 €/lot/an (ARC, Fédération des ascenseurs) · décret 87-713", "sourceId": "arc" },
+    "chauffage": { "assiette": "m2", "perM2Mois": 0.85, "sourceType": "ordre-de-grandeur", "source": "Ordre de grandeur · ratios d'observatoires de charges (ARC)", "sourceId": "arc" },
+    "eau": { "assiette": "occ", "sourceType": "sourcé", "source": "SISPEA (OFB / eaufrance), rapport 2025 — 4,69 €/m³ × 53 m³/pers./an", "sourceId": "sispea2025" },
+    "teom": { "assiette": "m2", "perM2Mois": 0.21, "sourceType": "ordre-de-grandeur", "source": "Moyenne nationale · récupérable à 100 % (art. 23 loi 1989) · affinée par commune prochainement", "sourceId": "teom" }
+  }
+}

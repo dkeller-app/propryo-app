@@ -11543,3 +11543,26 @@ body[data-dash-v4="on"] .v4s-gest2-pill.warn{background:#fef3c7;color:#92400e}
   .jp-tens{max-width:none}
   .jp-sources{max-width:none}
 }
+/* CHARGES RÉCUPÉRABLES — estimation par assiette, poste par poste (1 ligne = poste · pourquoi · assiette · source · montant) */
+.jp-charges-head .jp-note{margin-top:3px}
+.jp-cedit{display:flex;flex-wrap:wrap;gap:10px 16px;margin:12px 0 2px;justify-content:center}
+.jp-cfield{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--t2)}
+.jp-cfield input{width:96px;font:inherit;font-size:16px;font-weight:700;color:var(--t1);background:var(--sur2);border:1px solid var(--bor);border-radius:10px;padding:8px 10px;min-height:40px}
+.jp-clines{margin-top:12px;border:1px solid var(--bor2);border-radius:var(--r);overflow:hidden;background:var(--sur)}
+.jp-cline{display:flex;gap:12px;padding:12px;border-bottom:1px solid var(--bor2)}
+.jp-cline:last-child{border-bottom:0}
+.jp-cic{width:34px;height:34px;flex:0 0 34px;border-radius:9px;background:var(--grn-bg);color:var(--grn);display:flex;align-items:center;justify-content:center}
+.jp-cmid{flex:1;min-width:0}
+.jp-cnm{font-weight:700;font-size:14px;color:var(--t1)}
+.jp-cwhy{color:var(--t2);font-size:12px;margin-top:3px;line-height:1.45}
+.jp-ctags{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.jp-cass{font-size:10.5px;font-weight:700;color:var(--acc);background:var(--acc-soft);border:1px solid color-mix(in srgb,var(--acc) 30%,var(--bor));border-radius:6px;padding:2px 7px}
+.jp-csrc{font-size:10.5px;font-weight:600;color:var(--t3);background:var(--sur2);border:1px solid var(--bor2);border-radius:6px;padding:2px 7px}
+.jp-cst{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 7px}
+.jp-cst-src{color:var(--grn);background:var(--grn-bg);border:1px solid color-mix(in srgb,var(--grn) 30%,transparent)}
+.jp-cst-og{color:var(--ora);background:var(--ora-bg);border:1px solid color-mix(in srgb,var(--ora) 30%,transparent)}
+.jp-camt{font-weight:800;font-size:16px;color:var(--t1);white-space:nowrap;align-self:center;letter-spacing:-.02em}
+@media (max-width:480px){
+  .jp-cedit{justify-content:flex-start}
+  .jp-cfield input{width:100%}
+}

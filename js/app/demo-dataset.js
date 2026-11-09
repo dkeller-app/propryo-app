@@ -137,6 +137,23 @@
     var ADR_SCI = '12 rue des Tanneurs, 68100 Mulhouse', ADR_PERSO = '8 avenue de la République, 68000 Colmar';
     var GERANTE = 'Claire Morel';
 
+    // ── Postes de charges collectifs de l'immeuble de la SCI (Les Tanneurs) ───────────────────────
+    // Forme EXACTE d'un compteur collectif créé par saveCcForm (app-part2.js). Les montants facturés
+    // sont des mouvements bancaires portant `compteurCcId` (ci-dessous) : _ccTotalFactureYear les somme,
+    // _calcCcQuotePart répartit par logement selon la clé. Aucune donnée réelle.
+    var CC = { eauf: 'cc_demo_eauf', chauff: 'cc_demo_chauff', asc: 'cc_demo_asc', entretien: 'cc_demo_entretien' };
+    function compteurCollectif(id, nom, type, cle, fourn) {
+      return { id: id, nom: nom, type: type, typeLabel: '', cleRepartition: cle, fallbackRepartition: '',
+        scope: [], numCompteur: '', fournisseur: fourn || '', composition: [], releves: [], factures: [], forfaitParts: {},
+        _modifiedAt: '2026-01-10T09:00:00.000Z' };
+    }
+    var compteursSCI = [
+      compteurCollectif(CC.eauf, 'Eau froide générale', 'eau-f', 'tantiemes', 'Eau de Mulhouse'),
+      compteurCollectif(CC.chauff, 'Chauffage collectif', 'chauff', 'surface', 'Énergie Démo'),
+      compteurCollectif(CC.asc, 'Ascenseur', 'ascenseur', 'proportionnel', 'Ascenseurs Démo'),
+      compteurCollectif(CC.entretien, 'Entretien parties communes', 'entretien-pc', 'tantiemes', 'Propreté Démo')
+    ];
+
     // ── Bailleurs ───────────────────────────────────────────────────────────────────────────────
     var entites = [
       { id: 1, nom: SCI, type: 'SCI IR', siren: '912345678', rcs: 'Mulhouse', capital: '1 000 €',
@@ -147,7 +164,7 @@
         entityId: 'eid_demo_sci', members: [], driveFileId: null, driveFolderId: null,
         immeubles: [{ id: 100, nom: IMM_SCI, adr: '12 rue des Tanneurs', codePostal: '68100', ville: 'Mulhouse',
           annee: 1975, periodeConstr: 'De 1949 à 1997', regimeJuridique: 'Copropriété', typeHabitat: 'Collectif', nbLots: 4,
-          equipementsCommuns: { customs: [] }, syndic: null, compteursCollectifs: [], driveFolderId: null }] },
+          equipementsCommuns: { customs: [], ascenseur: true }, syndic: null, compteursCollectifs: compteursSCI, driveFolderId: null }] },
       { id: 2, nom: PERSO, type: 'Personne physique', siren: '', rcs: '', capital: '',
         gerants: [], gerant: '', siege: '5 rue des Clefs, 68000 Colmar',
         iban: 'FR76 9999 9030 0000 0987 6543 242', bic: 'DEMOFRP0XXX', emailEnvoi: '',
@@ -421,8 +438,16 @@
     mv('2026-03-18', 'PLOMBERIE DEMO FACT 2026-0412 D-101', 'Travaux (entretien, réparation, amélioration)', 'D-101', IMM_SCI, -650);
     mv('2026-09-08', 'PEINTURE DEMO FACT 2026-118 D-103', 'Travaux (entretien, réparation, amélioration)', 'D-103', IMM_SCI, -940);
     mv('2026-04-20', 'CABINET COMPTABLE EXPERT 68 HONORAIRES 2025', 'Frais de gestion / honoraires / comptabilité', 'SCI:' + SCI, '', -360);
-    mv('2026-02-10', 'PRLV EAU MULHOUSE PARTIES COMMUNES', 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -312);
-    mv('2025-02-11', 'PRLV EAU MULHOUSE PARTIES COMMUNES', 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -296);
+    mv('2026-02-10', 'PRLV EAU MULHOUSE PARTIES COMMUNES', 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -312, { compteurCcId: CC.eauf });
+    mv('2025-02-11', 'PRLV EAU MULHOUSE PARTIES COMMUNES', 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -296, { compteurCcId: CC.eauf });
+    // Postes de charges collectifs facturés (chauffage, ascenseur, entretien) — mouvements rattachés au compteur
+    // (compteurCcId) ; répartis par logement à la régularisation (onglet Charges) et agrégés par l'estimateur de juste-prix.
+    function ccFact(ccId, lib, montant, dates) {
+      dates.forEach(function (d) { mv(d, lib, 'Charges récupérables (eau, énergie…)', '', IMM_SCI, -montant, { compteurCcId: ccId }); });
+    }
+    ccFact(CC.chauff, 'PRLV ENERGIE DEMO CHAUFFAGE COLLECTIF LES TANNEURS', 410, ['2025-01-12', '2025-04-12', '2025-07-12', '2025-10-12', '2026-01-12', '2026-04-12', '2026-07-12']);
+    ccFact(CC.asc, 'PRLV ASCENSEURS DEMO CONTRAT ENTRETIEN', 185, ['2025-01-20', '2025-07-20', '2026-01-20', '2026-07-20']);
+    ccFact(CC.entretien, 'PRLV PROPRETE DEMO ENTRETIEN PARTIES COMMUNES', 98, ['2025-01-18', '2025-04-18', '2025-07-18', '2025-10-18', '2026-01-18', '2026-04-18', '2026-07-18']);
     mv('2026-09-15', 'VIR M THOMAS ROY RESTITUTION DEPOT GARANTIE', 'Dépôt de garantie (reçu / restitué)', 'D-103', IMM_SCI, -440);
     mv('2025-11-20', 'VIR MME SOPHIE KLEIN RESTITUTION DEPOT GARANTIE', 'Dépôt de garantie (reçu / restitué)', 'D-102', IMM_SCI, -880);
     mv('2026-04-22', 'VIR MME INES MOREAU RESTITUTION DEPOT GARANTIE', 'Dépôt de garantie (reçu / restitué)', 'D-104', IMM_SCI, -1520);
@@ -484,18 +509,38 @@
       var photo = o && o.photo;
       documents.push(Object.assign({ id: did++, parentType: 'candidat', parentId: cand, category: category, pieceType: pieceType,
         name: nom, originalName: nom, mime: photo ? 'image/jpeg' : 'application/pdf', size: photo ? 48000 : 1200, uploadedAt: recu,
-        idbKey: photo ? 'demo_cand_photo' : 'demo_cand_pdf' }, o && o.verif ? { _demoVerif: o.verif } : {}));
+        idbKey: photo ? 'demo_cand_photo' : 'demo_cand_pdf' },
+        o && o.verif ? { _demoVerif: o.verif } : {},
+        o && o.verifIa ? { verifIa: o.verifIa } : {}));
+    }
+    // ── Lecture IA PRÉ-CALCULÉE des bulletins / contrats (lot 3, regles-bulletin.js) ────────────────
+    // `verifIa` = ce que stockerait la lecture relais « bulletin-paie » sur un document fictif : la valeur LUE
+    // (`lu`), PAS un verdict. Les règles (analyserBulletins) tournent en LOCAL à l'ouverture de la fiche sur ces
+    // valeurs — montants cohérents (B1/B2/N1/S1), cumuls en continuité (B4/CB), employeur et nom concordants —
+    // pour que « Lecture par l'IA » montre un résultat sans aucun appel réseau. Aucun vrai numéro (SIRET à zéros).
+    var SIRET_DEMO = '00000000000000';
+    function iaBulletin(salarie, employeur, periode, cumulBrut, cumulNetImp, recu) {
+      return { le: recu, type: 'bulletin', rejets: 0, modele: 'démonstration (résultat pré-calculé)', corrections: {},
+        lu: { lisible: true, periode: periode, salarie: salarie, employeur: employeur, siret: SIRET_DEMO, dateEntree: '2024-03-01',
+          heures: 151.67, tauxHoraire: 21.10, salaireBase: 3200, brut: 3200, totalCotisations: 700, netSocial: 2560,
+          netAvantImpot: 2500, impotBase: 2600, impotTaux: 1.90, impotMontant: 49.40, netAPayer: 2450.60, netImposable: 2600,
+          cumulBrut: cumulBrut, cumulNetImposable: cumulNetImp, lignes: [], autresLignes: [] } };
+    }
+    function iaContrat(salarie, employeur, dateDebut, typeContrat, recu) {
+      return { le: recu, type: 'contrat', rejets: 0, modele: 'démonstration (résultat pré-calculé)', corrections: {},
+        lu: { lisible: true, salarie: salarie, employeur: employeur, siret: SIRET_DEMO, dateDebut: dateDebut, typeContrat: typeContrat } };
     }
     var R1 = '2026-09-18T09:12:00.000Z', R2 = '2026-09-29T14:03:00.000Z';
     pc('cand_demo_1', 'identite', 'I.A.1', 'Carte d\'identité Emma Rousseau.pdf', R1);
     pc('cand_demo_1', 'domicile', 'I.B.1', 'Quittances juin à août 2026.pdf', R1);
-    pc('cand_demo_1', 'situation', 'I.C.1', 'Contrat de travail Centre médical Démo.pdf', R1);
-    pc('cand_demo_1', 'ressources', 'I.D.2', 'Bulletins de salaire juin à août 2026.pdf', R1);
+    pc('cand_demo_1', 'situation', 'I.C.1', 'Contrat de travail Centre médical Démo.pdf', R1, { verifIa: iaContrat('Emma Rousseau', 'Centre médical Démo', '2024-03-01', 'CDI', R1) });
+    pc('cand_demo_1', 'ressources', 'I.D.2', 'Bulletin de salaire juillet 2026.pdf', R1, { verifIa: iaBulletin('Emma Rousseau', 'Centre médical Démo', '2026-07', 22400, 18200, R1) });
+    pc('cand_demo_1', 'ressources', 'I.D.2', 'Bulletin de salaire août 2026.pdf', R1, { verifIa: iaBulletin('Emma Rousseau', 'Centre médical Démo', '2026-08', 25600, 20800, R1) });
     pc('cand_demo_1', 'ressources', 'I.D.1', 'Avis d\'impôt 2026 sur les revenus 2025.pdf', R1, { verif: 'avis-valide' });
     pc('cand_demo_1', 'garant', 'II.A.1', 'Garant - carte d\'identité Jean Rousseau.pdf', R1);
     pc('cand_demo_1', 'garant', 'II.E.1', 'Garant - avis d\'impôt 2026.pdf', R1, { verif: 'avis-valide-garant' });
     pc('cand_demo_2', 'identite', 'I.A.1', 'CNI Thomas Girard.pdf', R2);
-    pc('cand_demo_2', 'situation', 'I.C.1', 'Contrat CDD Mairie de Démoville.pdf', R2);
+    pc('cand_demo_2', 'situation', 'I.C.1', 'Contrat CDD Mairie de Démoville.pdf', R2, { verifIa: iaContrat('Thomas Girard', 'Mairie de Démoville', '2026-01-05', 'CDD', R2) });
     pc('cand_demo_2', 'ressources', 'I.D.1', 'Photo avis d\'imposition.jpg', R2, { photo: true, verif: 'avis-sans-code' });
 
     // ── Carnet d'artisans (circuit d'un incident, v15.738) ───────────────────────────────────────────────────────
@@ -632,7 +677,8 @@
       mouvements: mvts, quittances: quittances, edl: edls, mrh: mrh, assurances: assurances,
       candidats: candidats, documents: documents, agenda: agenda, incidents: incidents, artisans: artisans,
       loyerBareme: loyerBareme, irlHistorique: irlHistorique, importRules: importRules,
-      params: { bankAccounts: bankAccounts, _loyerBaremeMigreV1: true, agendaAutoEcartes: agendaAutoEcartes }
+      params: { bankAccounts: bankAccounts, _loyerBaremeMigreV1: true, agendaAutoEcartes: agendaAutoEcartes,
+        verifPieces: { locaux: true, ia: true, iaMode: 'demande' } }
     };
     return { db: db, fichiers: fichiers, nuage: nuage };
   }

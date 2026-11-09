@@ -1184,8 +1184,8 @@ function _lyDpeBlock(etats) {
   }
   const n = aCompleter.length;
   if (!n) {
-    return `<div class="ly2-blk t-info"><div class="ly2-h"><span class="t">${_uiIcon('tag')} DPE à compléter</span>`
-      + `<span class="c">tous les DPE des lots loués sont renseignés</span></div></div>`;
+    return `<div class="ly2-blk t-info"><div class="ly2-h"><span class="t">${_uiIcon('tag')} DPE à jour</span>`
+      + `<span class="c" style="margin-left:8px">tous les lots loués ont leur DPE renseigné</span></div></div>`;
   }
   const rows = aCompleter.map(({ e, expire }) => {
     const ref = _lyQ(e.ref);
@@ -1198,7 +1198,7 @@ function _lyDpeBlock(etats) {
       + `<button type="button" class="btn bs bb" onclick="_lyDpeNonConcerne('${ref}')" title="Garage, cave, parking — pas de DPE exigible par nature">non concerné</button></span></div>`;
   }).join('');
   return `<div class="ly2-blk t-info"><div class="ly2-h"><span class="t">${_uiIcon('tag')} DPE à compléter</span>`
-    + `<span class="c">${n} lot${n > 1 ? 's' : ''} sans DPE en base — la révision reste possible, mais un F ou G ne se révise pas</span></div>`
+    + `<span class="c" style="margin-left:8px">${n} lot${n > 1 ? 's' : ''} sans DPE en base — la révision reste possible, mais un F ou G ne se révise pas</span></div>`
     + `<div class="ly-dpe-body">${rows}</div></div>`;
 }
 // I17 — écrit la classe + la date sur le BIEN (log.diagnostics.dpe), source de vérité. La date
@@ -17928,7 +17928,7 @@ function _buildDdtRecapHTML(log) {
       </div>
 
       <div style="margin-top:14px;font-size:10px;color:#999;text-align:right">
-        Propryo v15.793 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
+        Propryo v15.796 — Récap diagnostics généré automatiquement le ${escHtml(todayStr)}
       </div>
     </div>`;
 }
@@ -20439,13 +20439,23 @@ function _jpBuildInput(log, bail, ref) {
   let address = '';
   try { if (window.LogImmResolver && typeof window.LogImmResolver.resolveAddressForLog === 'function') address = (window.LogImmResolver.resolveAddressForLog(log, imm) || {}).full || ''; } catch (e) { /* noop */ }
   if (!address) address = (log && log.adr) || '';
+  // Charges récupérables (estimateur par assiette) : équipements de l'immeuble + nb de logements +
+  // eau collective, lus SANS ressaisie. Absents (nouvel immeuble) → l'estimateur marche quand même.
+  const ec = (imm && imm.equipementsCommuns) || {};
+  const nbLogements = maison ? 1 : Math.max(1, (DB.logements || []).filter(_isAlive)
+    .filter(l => l && l.imm && l.imm === (log && log.imm) && l.entity === (log && log.entity)).length);
+  const eauColl = !!(log && ((log.eau && log.eau.coll) || (log.ecs && log.ecs.coll)));
   return {
     surf: +((log && log.surf)) || 0,
     maison,
     nbPieces: _jpNbPieces(log, bail),
     chauffageColl: !!(log && log.chauffage && log.chauffage.coll),
     ecsColl: !!(log && log.ecs && log.ecs.coll),
+    eauColl,
     copro: !maison,
+    nbLogements,
+    occupants: occupantsParDefautApp(_jpNbPieces(log, bail)),
+    equip: { ascenseur: !!ec.ascenseur, gardien: !!ec.gardien, verts: !!ec.jardin_commun },
     dpeClasse: _jpDpeClasse(log),
     usageApplicable: _jpUsageApplicable(log),
     meuble: /meuble/i.test(String((log && log.typeUsage) || '')),
@@ -20454,8 +20464,19 @@ function _jpBuildInput(log, bail, ref) {
   };
 }
 
+/** Occupants prévus par défaut depuis le nb de pièces (délègue au module pur, repli local si absent). */
+function occupantsParDefautApp(nbPieces) {
+  try { const JP = window.JustePrix; if (JP && typeof JP.occupantsParDefaut === 'function') return JP.occupantsParDefaut(nbPieces); } catch (e) { /* noop */ }
+  const n = Number(nbPieces);
+  if (!Number.isFinite(n) || n <= 0) return 2;
+  return Math.min(8, Math.max(1, Math.round(n)));
+}
+
 // Cache mémoire du fichier de données (chargé une seule fois, puis servi par le SW hors ligne).
 let _jpCarteData = null, _jpCartePromise = null;
+// Mémoire des entrées de charges par logement (pour recalcul en place quand on modifie
+// occupants / nombre de logements) — en MÉMOIRE SEULE, rien à persister.
+let _jpChargesState = {};
 function _jpLoadCarteLoyers() {
   if (_jpCarteData) return Promise.resolve(_jpCarteData);
   if (_jpCartePromise) return _jpCartePromise;
@@ -20482,11 +20503,12 @@ function _jpLoadTension() {
     _jpLoadJson('js/data/zonage-abc-2026.json'),
     _jpLoadJson('js/data/zone-tendue-2025.json'),
     _jpLoadJson('js/data/encadrement-communes.json'),
-    _jpLoadJson('js/data/oll-loyers.json')   // TRANCHE 3 : loyers pratiqués (Observatoires Locaux des Loyers)
-  ]).then(([zonage, tlv, encadrement, oll]) => {
-    _jpTensData = { zonage, tlv, encadrement, oll };
+    _jpLoadJson('js/data/oll-loyers.json'),   // TRANCHE 3 : loyers pratiqués (Observatoires Locaux des Loyers)
+    _jpLoadJson('js/data/charges-reference.json')   // Barème sourcé des charges récupérables par assiette
+  ]).then(([zonage, tlv, encadrement, oll, chargesRef]) => {
+    _jpTensData = { zonage, tlv, encadrement, oll, chargesRef };
     return _jpTensData;
-  }).catch(() => { _jpTensPromise = null; return { zonage: null, tlv: null, encadrement: null, oll: null }; });
+  }).catch(() => { _jpTensPromise = null; return { zonage: null, tlv: null, encadrement: null, oll: null, chargesRef: null }; });
   return _jpTensPromise;
 }
 
@@ -20532,6 +20554,17 @@ const _JP_SVG = {
   trend: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>',
   scale: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/><path d="M8 21h8"/></svg>',
   layers: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>'
+};
+
+// Icônes (ligne) des postes de charges récupérables — clé `icon` du module js/core/juste-prix.js.
+const _JP_POSTE_SVG = {
+  broom: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 4.6 15 9"/><path d="M14 10c-2.5-2.5-5-2-7 0-1.8 1.8-2.5 4.3-3 7 2.7-.5 5.2-1.2 7-3 2-2 2.5-4.5 0-7Z"/><path d="M8 16l-4 4"/><path d="M12 12l3 3"/></svg>',
+  tree: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-7"/><path d="M9 9a3 3 0 0 1 3-6 3 3 0 0 1 3 6 3.5 3.5 0 0 1 2 6H7a3.5 3.5 0 0 1 2-6Z"/></svg>',
+  concierge: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>',
+  elevator: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="m9 9 1.5-2 1.5 2"/><path d="m12 15 1.5 2 1.5-2" transform="translate(0.5 0)"/><path d="m9 15 1.5 2L12 15"/><path d="m12.5 9 1.5-2 1.5 2"/></svg>',
+  flame: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-1-.5-2-1.5-3 0 1-1 1.5-1.5 1.5.5-2-1-4-3-5 .5 2-1 3-2 4.5C5 9 4.5 10.3 4.5 12A4.5 4.5 0 0 0 9 16.5"/><path d="M14 9c1.5 1 3 2.5 3 5a5 5 0 0 1-10 0"/></svg>',
+  drop: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7S6 9 6 14a6 6 0 0 0 12 0c0-5-6-11.3-6-11.3Z"/></svg>',
+  trash: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>'
 };
 
 /** Bandeau « sources recoupées » (annonces ANIL + loyers pratiqués OLL quand un observatoire couvre la commune). */
@@ -20652,8 +20685,11 @@ async function _jpEstimer(ref) {
         oll = JP.ollReference(ban.insee, seg, tz.oll);
       }
     } catch (e) { /* noop : l'OLL est un recoupement, jamais bloquant */ }
-    const res = window.JustePrix.evaluer(input, rec, { meta: data.meta, ollMeta: (tz && tz.oll && tz.oll.meta) || null, dateRef: new Date().toISOString().slice(0, 10), tension, encadrement, oll });
-    body.innerHTML = _jpRenderResult(res, { ban, ref, meuble: input.meuble });
+    const chargesRef = (tz && tz.chargesRef) || null;
+    const res = window.JustePrix.evaluer(input, rec, { meta: data.meta, ollMeta: (tz && tz.oll && tz.oll.meta) || null, dateRef: new Date().toISOString().slice(0, 10), tension, encadrement, oll, chargesRef });
+    // Mémoire pour recalcul en place des charges (occupants / nb de logements modifiables).
+    _jpChargesState[ref] = { input, chargesRef, meta: (chargesRef && chargesRef.meta) || null };
+    body.innerHTML = _jpRenderResult(res, { ban, ref, meuble: input.meuble, log });
   } catch (e) {
     console.warn('[juste-prix]', e);
     body.innerHTML = `<div class="jp-muted">Estimation indisponible pour le moment (données ou localisation inaccessibles). Réessayer plus tard.</div>${_jpRetryBtn(ref)}`;
@@ -20704,11 +20740,8 @@ function _jpRenderResult(res, ctx) {
   } else {
     dpeHtml = `<div class="jp-alert jp-adv"><span class="jp-ai">${_JP_SVG.info}</span><div>DPE non renseigné : la contrainte de gel (F/G) et le calendrier d'interdiction ne peuvent pas être vérifiés. Renseigner le DPE du bien pour une suggestion complète.</div></div>`;
   }
-  // ── Provision : détails
-  const prov = res.provision || { montant: 0, details: [] };
-  const provRows = (prov.details || []).map(d =>
-    `<div class="jp-row"><span class="jp-k">${escHtml(d.k)}</span><span class="jp-v">${(+d.m2).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €/m²</span></div>`).join('')
-    || `<div class="jp-row"><span class="jp-k">Aucune charge récupérable estimée</span><span class="jp-v">—</span></div>`;
+  // ── Provision de charges récupérables : estimation par poste (par assiette, sourcée)
+  const prov = res.provision || { montant: 0, lignes: [] };
   const srcAttr = (res.meta && res.meta.attribution) || 'Estimations ANIL, à partir des données du Groupe SeLoger et de leboncoin';
 
   return `
@@ -20753,25 +20786,129 @@ function _jpRenderResult(res, ctx) {
     ${compHtml}
     ${dpeHtml}
 
-    <div class="jp-range" style="padding-top:14px;margin-top:4px;border-top:1px solid var(--bor2)">
-      <div class="jp-lbl">Provision de charges proposée</div>
-      <div class="jp-val" style="font-size:26px">≈ ${fmtN(prov.montant)}&nbsp;<small>€ / mois</small></div>
-      <div class="jp-sub">Estimation prudente, régularisée une fois par an sur charges réelles.</div>
+    <div class="jp-charges-head" style="padding-top:16px;margin-top:6px;border-top:1px solid var(--bor2)">
+      <div class="jp-lbl" style="text-transform:uppercase;font-size:11.5px;font-weight:700;color:var(--t3);letter-spacing:.05em">Charges récupérables — combien et pourquoi</div>
+      <p class="jp-note" style="margin-top:3px">À la mise en location, sans historique : une provision de référence, poste par poste, avec son assiette et sa source.</p>
     </div>
-    <details class="jp-details">
-      <summary>${_JP_SVG.info} D'où vient cette provision ${_JP_SVG.chev}</summary>
-      <div class="jp-det-b">
-        <div class="jp-rows">
-          <div class="jp-row"><span class="jp-k">Chauffage</span><span class="jp-v">${res.provision && res.provision.details.some(d => /^Chauffage collectif/.test(d.k)) ? 'collectif<small> → inclus</small>' : 'individuel<small> → hors provision</small>'}</span></div>
-          ${provRows}
-          <div class="jp-row jp-sum"><span class="jp-k"><b>Provision mensuelle estimée</b></span><span class="jp-v">≈ ${fmt(prov.montant)}</span></div>
-        </div>
-        <p>La provision couvre les charges <b>récupérables</b> (parties communes, et le cas échéant chauffage / eau chaude collectifs). C'est une <b>estimation</b>, régularisée chaque année sur les charges réelles — elle n'est pas calculée par Finances.</p>
-        <div class="jp-src">${_JP_SVG.book}<span>Charges récupérables : décret n° 87-713. Type de chauffage et d'eau chaude lus dans la fiche du bien.</span></div>
-      </div>
-    </details>
+    <div id="jp-charges">${_jpRenderChargesBlock(prov, ctx)}</div>
 
     <p class="jp-note" style="text-align:left;margin-top:12px">Suggestion, jamais un verdict — l'utilisateur décide du loyer et des charges. Aucun montant n'est enregistré automatiquement.</p>`;
+}
+
+/** Libellé + classe du marqueur de type de source d'un poste (chiffre ferme sourcé vs ordre de grandeur). */
+function _jpSrcTypeBadge(sourceType) {
+  if (sourceType === 'sourcé') return '<span class="jp-cst jp-cst-src" title="Chiffre ferme issu d\'une source publique">source</span>';
+  return '<span class="jp-cst jp-cst-og" title="Ordre de grandeur raisonné, à régulariser sur charges réelles">ordre de grandeur</span>';
+}
+
+/**
+ * Bloc « Charges récupérables » : total de référence + une ligne par poste (poste · pourquoi · tag
+ * assiette corail · tag source + type · montant), champs occupants / logements modifiables, bandeau
+ * « à régulariser », et — en BONUS — les charges réelles de l'immeuble si des postes Propryo existent.
+ */
+function _jpRenderChargesBlock(prov, ctx) {
+  ctx = ctx || {};
+  const lignes = (prov && prov.lignes) || [];
+  const total = (prov && prov.montant) || 0;
+  const occ = (prov && prov.occupants) || 0;
+  const nlog = (prov && prov.nbLogements) || 1;
+  const perM2An = (prov && prov.perM2Annuel) || 0;
+  const refSafe = ctx.ref ? _lyQ(ctx.ref) : '';
+  const aEau = lignes.some(l => l.k === 'eau');
+  const aForfait = lignes.some(l => l.assiette === 'forfait');
+
+  const linesHtml = lignes.length ? lignes.map(l => `
+    <div class="jp-cline">
+      <span class="jp-cic">${_JP_POSTE_SVG[l.icon] || _JP_SVG.euro}</span>
+      <div class="jp-cmid">
+        <div class="jp-cnm">${escHtml(l.nm)}</div>
+        <div class="jp-cwhy">${escHtml(l.pourquoi)}</div>
+        <div class="jp-ctags"><span class="jp-cass">${escHtml(l.assietteLabel)}</span><span class="jp-csrc">${escHtml(l.source)}</span>${_jpSrcTypeBadge(l.sourceType)}</div>
+      </div>
+      <span class="jp-camt">${fmt(l.montant)}</span>
+    </div>`).join('')
+    : `<div class="jp-muted" style="padding:10px 0">Aucune charge récupérable identifiée pour ce bien (maison individuelle : essentiellement la taxe d'ordures ménagères).</div>`;
+
+  // Champs modifiables (seulement s'ils pilotent un poste affiché) — recalcul en place.
+  const editable = ctx.ref && (aEau || aForfait);
+  const ctrlOcc = aEau
+    ? `<label class="jp-cfield">Occupants prévus <input id="jp-occ" type="number" min="1" max="8" value="${occ}" oninput="_jpRecalcCharges('${refSafe}')"></label>` : '';
+  const ctrlNlog = aForfait
+    ? `<label class="jp-cfield">Logements dans l'immeuble <input id="jp-nlog" type="number" min="1" max="300" value="${nlog}" oninput="_jpRecalcCharges('${refSafe}')"></label>` : '';
+  const editRow = editable ? `<div class="jp-cedit">${ctrlOcc}${ctrlNlog}</div>` : '';
+
+  // BONUS : charges réelles de l'immeuble (module Postes de charges), jamais par défaut.
+  const reel = ctx.log ? _jpChargesReellesLog(ctx.log) : null;
+  const reelHtml = (reel && reel.montant > 0) ? `
+    <div class="jp-alert jp-adv" style="margin-top:12px">
+      <span class="jp-ai">${_JP_SVG.layers}</span>
+      <div><b>Postes de charges réels de l'immeuble (${escHtml(String(reel.year))}) : ≈ ${fmt(reel.montant)} / mois.</b> Calculé sur ${reel.nbPostes} poste${reel.nbPostes > 1 ? 's' : ''} de l'immeuble et la quote-part de ce logement (charges facturées ÷ 12). À comparer à l'estimation ci-dessus ; une fois l'année écoulée, c'est cette base réelle qui fait foi (régularisation).
+      <span class="jp-law">Lu dans Finances (source unique) — aucun montant recalculé ni enregistré ici.</span></div>
+    </div>` : '';
+
+  return `
+    <div class="jp-range" style="padding-top:4px">
+      <div class="jp-val" style="font-size:30px">≈ ${fmtN(total)}&nbsp;<small>€ / mois</small></div>
+      <div class="jp-sub">Provision de référence récupérable${perM2An ? ' · soit ≈ ' + perM2An.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' €/m²/an' : ''}</div>
+    </div>
+    ${editRow}
+    <div class="jp-clines">${linesHtml}</div>
+    <div class="jp-alert jp-ora" style="margin-top:12px">
+      <span class="jp-ai">${_JP_SVG.info}</span>
+      <div><b>Estimation à régulariser.</b> Hors le prix de l'eau (SISPEA), les montants sont des <b>ordres de grandeur</b> à partir de moyennes ; ils se régularisent chaque année sur les charges réelles (art. 23, loi du 6 juillet 1989). Ordures ménagères : moyenne nationale, affinée par commune prochainement (le code INSEE est déjà connu).
+      <span class="jp-law">Postes récupérables fixés par le décret n° 87-713 du 26/08/1987 (liste limitative) ; TEOM récupérable à 100 %. Le gros entretien (ex. remplacement d'ascenseur) reste à la charge du propriétaire.</span></div>
+    </div>
+    ${reelHtml}`;
+}
+
+/** Recalcule le bloc charges en place quand l'utilisateur change occupants / nb de logements. */
+function _jpRecalcCharges(ref) {
+  try {
+    const st = _jpChargesState[ref]; const host = el('jp-charges');
+    const JP = window.JustePrix;
+    if (!st || !host || !JP || typeof JP.estimerChargesParPoste !== 'function') return;
+    const occ = el('jp-occ') ? Math.min(8, Math.max(1, +el('jp-occ').value || st.input.occupants || 2)) : st.input.occupants;
+    const nlog = el('jp-nlog') ? Math.max(1, +el('jp-nlog').value || st.input.nbLogements || 1) : st.input.nbLogements;
+    const input = Object.assign({}, st.input, { occupants: occ, nbLogements: nlog });
+    const r = JP.estimerChargesParPoste({
+      surf: input.surf, maison: !!input.maison, copro: input.maison ? false : (input.copro !== false),
+      nbPieces: input.nbPieces, occupants: occ, nbLogements: nlog,
+      chauffageColl: !!input.chauffageColl, eauColl: (input.eauColl != null) ? !!input.eauColl : !!input.ecsColl,
+      equip: input.equip
+    }, st.chargesRef || null);
+    const prov = { montant: r.total, perM2Annuel: r.perM2Annuel, occupants: r.occupants, nbLogements: r.nbLogements, lignes: r.lignes };
+    const log = (DB.logements || []).find(l => l.ref === ref) || null;
+    host.innerHTML = _jpRenderChargesBlock(prov, { ref, log });
+  } catch (e) { console.warn('[jp-charges]', e); }
+}
+
+/**
+ * BONUS — charges RÉELLES récupérables mensuelles d'un logement, d'après le module « Postes de charges »
+ * de l'immeuble (compteurs collectifs facturés × quote-part ÷ 12). Lecture SEULE de Finances. Retourne
+ * { montant, year, nbPostes } ou null si aucun poste réel facturé. JAMAIS le défaut, jamais bloquant.
+ */
+function _jpChargesReellesLog(log) {
+  try {
+    if (!log || typeof _finImmDuLot !== 'function' || typeof _calcCcQuotePart !== 'function' || typeof _ccTotalFactureYear !== 'function') return null;
+    const im = _finImmDuLot(log);
+    const ccs = (im && Array.isArray(im.compteursCollectifs)) ? im.compteursCollectifs.filter(_isAlive) : [];
+    if (!ccs.length) return null;
+    const allLogs = (DB.logements || []).filter(_isAlive).filter(l => l && l.imm === log.imm && l.entity === log.entity);
+    const thisYr = new Date().getFullYear();
+    // Dernière année (sur les 2 dernières) avec au moins une facture : on préfère une année pleine.
+    let best = null;
+    for (const yr of [thisYr - 1, thisYr]) {
+      let montant = 0, nb = 0;
+      for (const cc of ccs) {
+        const tot = _ccTotalFactureYear(cc, yr); if (!(tot > 0)) continue;
+        const scoped = (typeof _ccLogsInScope === 'function') ? _ccLogsInScope(cc, allLogs) : allLogs;
+        const qp = _calcCcQuotePart(im, log, cc, scoped);
+        if (qp && !qp.exclu && qp.ratio > 0) { montant += tot * qp.ratio; nb++; }
+      }
+      if (nb > 0) best = { montant: Math.round(montant / 12), year: yr, nbPostes: nb };
+    }
+    return best;
+  } catch (e) { return null; }
 }
 
 // HISTORIQUE-BAIL-ONGLET (17/07) : _renderBailTimeline (timeline horizontale) et

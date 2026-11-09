@@ -52,16 +52,67 @@ export const SURFACES_REF = { a12: 37, a3: 72, mai: 92 };
 /** Libellés des segments de la Carte des loyers. */
 export const SEG_LABEL = { a12: 'appartement T1-T2', a3: 'appartement T3 et +', mai: 'maison' };
 
+// ════════════════════════════════════════════════════════════════════════════
+// ESTIMATEUR DE CHARGES RÉCUPÉRABLES — PAR ASSIETTE, POSTE PAR POSTE
+// ────────────────────────────────────────────────────────────────────────────
+// But : aider le propriétaire À LA PREMIÈRE MISE EN LOCATION, sans aucune donnée, à savoir
+// COMBIEN de provision de charges demander ET POURQUOI, poste par poste. Marche à partir de zéro ;
+// les vraies charges Propryo (module « Postes de charges ») ne sont qu'un bonus (résolu dans l'app).
+//
+// Chaque poste déclare SON ASSIETTE (ce qui le pilote), fondée en droit :
+//   'm2'      → €/m² du logement/mois × surface  (charge générale ≈ tantièmes ≈ surface, art. 10 loi 1965)
+//   'occ'     → €/occupant/mois × occupants       (consommation d'eau, SISPEA)
+//   'forfait' → coût annuel de TOUT l'immeuble ÷ 12 ÷ nombre de logements (service fixe mutualisé)
+// Fondements : art. 10 loi n° 65-557 du 10/07/1965 ; décret n° 87-713 du 26/08/1987 (liste limitative
+// des charges récupérables) ; art. 23 loi n° 89-462 du 06/07/1989 (TEOM récupérable à 100 %).
+//
+// GARDE-FOU SOURCING : un seul coefficient est un CHIFFRE FERME SOURCÉ — le prix de l'eau (SISPEA). Tous
+// les autres sont des ORDRES DE GRANDEUR raisonnés, dérivés de ratios publics d'observatoires de charges
+// (ARC) ou de moyennes nationales (TEOM) — jamais présentés comme des montants fermes. Le champ
+// `sourceType` ('sourcé' | 'ordre-de-grandeur') le porte jusqu'à l'UI. Une provision estimée se
+// RÉGULARISE chaque année sur les charges réelles (art. 23 loi 1989). Les coefficients peuvent être
+// surchargés par le fichier de données js/data/charges-reference.json (passé en `ref`).
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Prix de l'eau SISPEA (OFB / eaufrance, rapport 2025, données 2023) — SEULE donnée FERME SOURCÉE. */
+export const EAU_DEFAUT = { prixM3: 4.69, m3ParPersonneAn: 53 };
+
 /**
- * Barème de PROVISION DE CHARGES (estimation prudente, en €/m²/mois). Charges RÉCUPÉRABLES =
- * décret n° 87-713. Valeurs volontairement rondes et présentées comme une ESTIMATION, régularisée
- * une fois par an sur charges réelles — ce n'est pas un calcul Finances.
- *   baseCopro  : parties communes de copropriété (entretien courant, eau froide, souvent ascenseur).
- *   baseMaison : maison individuelle (peu de charges récupérables : abords, TEOM).
- *   chauffColl : surcoût si le chauffage est COLLECTIF (poste de loin le plus lourd).
- *   ecsColl    : surcoût si l'eau chaude est COLLECTIVE.
+ * Catalogue des postes de charges récupérables, avec assiette, coefficient par défaut, explication et
+ * source. `quand(s)` décide l'applicabilité (logique en code, testée) ; les coefficients/sources peuvent
+ * être surchargés par le fichier de données (ref.postes[k]). `sourceType` distingue le chiffre FERME
+ * SOURCÉ (eau) des ORDRES DE GRANDEUR (tous les autres).
  */
-export const PROV_BAREME = { baseCopro: 0.50, baseMaison: 0.15, chauffColl: 1.30, ecsColl: 0.50 };
+export const CHARGES_POSTES = [
+  { k: 'entretien', nm: 'Entretien & ménage des communs', icon: 'broom', assiette: 'm2', perM2Mois: 0.35,
+    pourquoi: "Nettoyage, éclairage et menu entretien du hall et des couloirs. Charge générale répartie aux tantièmes (≈ la surface du logement) — art. 10, loi du 10/07/1965.",
+    source: "Ordre de grandeur · ratios d'observatoires de charges (ARC) · décret 87-713", sourceType: 'ordre-de-grandeur',
+    quand: (s) => s.appart && s.copro },
+  { k: 'verts', nm: 'Espaces verts communs', icon: 'tree', assiette: 'm2', perM2Mois: 0.08,
+    pourquoi: "Tonte, taille et arrosage. Charge générale, répartie aux tantièmes (≈ la surface du logement).",
+    source: "Ordre de grandeur · décret 87-713 · loi 1965 art. 10", sourceType: 'ordre-de-grandeur',
+    quand: (s) => s.appart && s.verts },
+  { k: 'gardien', nm: 'Gardien / concierge', icon: 'concierge', assiette: 'forfait', forfaitAn: 18000,
+    pourquoi: "Part récupérable de la rémunération (75 % s'il assure entretien ET sortie des poubelles). Un salaire d'immeuble partagé entre les logements.",
+    source: "Ordre de grandeur · part récupérable 75 % · décret 87-713", sourceType: 'ordre-de-grandeur',
+    quand: (s) => s.appart && s.gardien },
+  { k: 'ascenseur', nm: 'Ascenseur (entretien)', icon: 'elevator', assiette: 'forfait', forfaitAn: 2200,
+    pourquoi: "Contrat d'entretien d'immeuble partagé entre les logements (service collectif, art. 10 loi 1965). Le remplacement de l'appareil reste à la charge du propriétaire, non récupérable.",
+    source: "Ordre de grandeur · ~180 €/lot/an (ARC, Fédération des ascenseurs) · décret 87-713", sourceType: 'ordre-de-grandeur',
+    quand: (s) => s.appart && s.ascenseur },
+  { k: 'chauffage', nm: 'Chauffage collectif', icon: 'flame', assiette: 'm2', perM2Mois: 0.85,
+    pourquoi: "Combustible + entretien de la chaudière. Proportionnel à la surface chauffée — le plus gros poste quand il existe.",
+    source: "Ordre de grandeur · ratios d'observatoires de charges (ARC)", sourceType: 'ordre-de-grandeur',
+    quand: (s) => s.appart && s.chauffColl },
+  { k: 'eau', nm: 'Eau (compteur collectif)', icon: 'drop', assiette: 'occ',
+    pourquoi: "Sur les occupants, pas la surface (~53 m³/personne/an × 4,69 €/m³). En compteur individuel, le locataire paie en direct → non repris ici.",
+    source: "SISPEA (OFB / eaufrance), rapport 2025 — 4,69 €/m³ × 53 m³/pers./an", sourceType: 'sourcé',
+    quand: (s) => s.appart && s.eauColl },
+  { k: 'teom', nm: 'Ordures ménagères (TEOM)', icon: 'trash', assiette: 'm2', perM2Mois: 0.21,
+    pourquoi: "Taxe assise sur la valeur locative du logement (≈ surface), récupérable à 100 %. Elle varie selon le taux voté par la commune ; certaines communes facturent au service (REOM).",
+    source: "Moyenne nationale · récupérable à 100 % (art. 23 loi 1989) · affinée par commune prochainement", sourceType: 'ordre-de-grandeur',
+    quand: () => true }
+];
 
 /** Largeur de la demi-fourchette selon la fiabilité de l'indicateur communal. */
 export const FOURCHETTE_WIDTH = { bon: 0.08, moyen: 0.12, faible: 0.16 };
@@ -100,20 +151,75 @@ export function fiabiliteSegment(rec) {
 }
 
 /**
- * Estime la provision de charges mensuelle (€). Entrées : surface, chauffage/eau chaude collectifs,
- * présence de parties communes (copropriété) ou maison individuelle.
- * @returns {{ montant:number, perM2:number, details:Array<{k:string,m2:number}>, indisponible:boolean }}
+ * Nombre d'occupants PRÉVU par défaut à partir du nombre de pièces principales (T2≈2, T4≈4), borné
+ * 1..8. Pièces inconnues → 2 (foyer type). Sert UNIQUEMENT à l'eau (compteur collectif) — modifiable.
  */
-export function estimerProvisionCharges({ surf, chauffageColl, ecsColl, copro, maison } = {}, bareme = PROV_BAREME) {
-  const s = Number(surf);
-  if (!Number.isFinite(s) || s <= 0) return { montant: 0, perM2: 0, details: [], indisponible: true };
-  const details = [];
-  let perM2 = 0;
-  if (maison) { perM2 += bareme.baseMaison; details.push({ k: 'Abords / entretien (maison individuelle)', m2: bareme.baseMaison }); }
-  else if (copro !== false) { perM2 += bareme.baseCopro; details.push({ k: 'Parties communes de copropriété (entretien, eau froide)', m2: bareme.baseCopro }); }
-  if (chauffageColl) { perM2 += bareme.chauffColl; details.push({ k: 'Chauffage collectif', m2: bareme.chauffColl }); }
-  if (ecsColl) { perM2 += bareme.ecsColl; details.push({ k: 'Eau chaude collective', m2: bareme.ecsColl }); }
-  return { montant: Math.max(0, _r5(perM2 * s)), perM2: _r2d(perM2), details, indisponible: false };
+export function occupantsParDefaut(nbPieces) {
+  const n = Number(nbPieces);
+  if (!Number.isFinite(n) || n <= 0) return 2;
+  return Math.min(8, Math.max(1, Math.round(n)));
+}
+
+/** Coefficient €/occupant/mois de l'eau (prix m³ × conso annuelle ÷ 12), surchargé par ref.eau. */
+function _perOccEau(ref) {
+  const e = (ref && ref.eau) || {};
+  const prixM3 = +e.prixM3 > 0 ? +e.prixM3 : EAU_DEFAUT.prixM3;
+  const m3 = +e.m3ParPersonneAn > 0 ? +e.m3ParPersonneAn : EAU_DEFAUT.m3ParPersonneAn;
+  return (prixM3 * m3) / 12;
+}
+
+/**
+ * Estime les charges RÉCUPÉRABLES mensuelles, POSTE PAR POSTE, par assiette. Fonction PURE : marche
+ * à partir de zéro (aucune donnée Propryo requise). Entrées :
+ *   { surf, maison, copro, nbPieces, occupants, nbLogements,
+ *     chauffageColl, eauColl (ou ecsColl), equip:{ascenseur,verts,gardien} }
+ * @param {object} ref - fichier js/data/charges-reference.json (surcharge coefficients/sources) ou null.
+ * @returns {{ indisponible:boolean, total:number, perM2Annuel:number, occupants:number,
+ *   nbLogements:number, lignes:Array<{k,nm,icon,assiette,assietteLabel,montant,pourquoi,source,sourceType}> }}
+ */
+export function estimerChargesParPoste(input = {}, ref = null) {
+  const surf = Number(input.surf);
+  const out = { indisponible: false, total: 0, perM2Annuel: 0, occupants: 0, nbLogements: 0, lignes: [] };
+  if (!Number.isFinite(surf) || surf <= 0) { out.indisponible = true; return out; }
+
+  const appart = !input.maison;
+  const copro = appart && (input.copro !== false);
+  const equip = input.equip || {};
+  const occupants = (Number.isFinite(+input.occupants) && +input.occupants > 0)
+    ? Math.min(8, Math.max(1, Math.round(+input.occupants))) : occupantsParDefaut(input.nbPieces);
+  const nbLog = (Number.isFinite(+input.nbLogements) && +input.nbLogements > 0) ? Math.round(+input.nbLogements) : 1;
+  out.occupants = occupants; out.nbLogements = nbLog;
+
+  const s = {
+    appart, copro,
+    chauffColl: !!input.chauffageColl,
+    eauColl: (input.eauColl != null) ? !!input.eauColl : !!input.ecsColl,
+    ascenseur: !!equip.ascenseur, verts: !!equip.verts, gardien: !!equip.gardien
+  };
+
+  for (const p of CHARGES_POSTES) {
+    if (!p.quand(s)) continue;
+    const o = (ref && ref.postes && ref.postes[p.k]) || null;
+    const src = (o && o.source) || p.source;
+    const srcType = (o && o.sourceType) || p.sourceType;
+    let montant = 0, assietteLabel = '';
+    if (p.assiette === 'm2') {
+      const perM2 = (o && +o.perM2Mois > 0) ? +o.perM2Mois : p.perM2Mois;
+      montant = perM2 * surf; assietteLabel = 'selon ' + surf + ' m²';
+    } else if (p.assiette === 'occ') {
+      montant = _perOccEau(ref) * occupants;
+      assietteLabel = 'selon ' + occupants + ' occupant' + (occupants > 1 ? 's' : '');
+    } else if (p.assiette === 'forfait') {
+      const forfaitAn = (o && +o.forfaitAn > 0) ? +o.forfaitAn : p.forfaitAn;
+      montant = forfaitAn / 12 / nbLog;
+      assietteLabel = 'part immeuble ÷ ' + nbLog + ' logement' + (nbLog > 1 ? 's' : '');
+    }
+    montant = Math.max(0, Math.round(montant));
+    out.lignes.push({ k: p.k, nm: p.nm, icon: p.icon, assiette: p.assiette, assietteLabel, montant, pourquoi: p.pourquoi, source: src, sourceType: srcType });
+    out.total += montant;
+  }
+  out.perM2Annuel = surf > 0 ? _r2d((out.total * 12) / surf) : 0;
+  return out;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -399,18 +505,25 @@ export function evaluer(input, record, options = {}) {
   out.euroM2CC = _r2d(euroM2CC);
   out.loyerCC = Math.round(euroM2CC * surf);
 
-  const prov = estimerProvisionCharges({
-    surf, chauffageColl: !!input.chauffageColl, ecsColl: !!input.ecsColl,
-    copro: input.maison ? false : (input.copro !== false), maison: !!input.maison
-  });
-  out.provision = prov;
+  const prov = estimerChargesParPoste({
+    surf, maison: !!input.maison, copro: input.maison ? false : (input.copro !== false),
+    nbPieces: input.nbPieces, occupants: input.occupants, nbLogements: input.nbLogements,
+    chauffageColl: !!input.chauffageColl,
+    eauColl: (input.eauColl != null) ? !!input.eauColl : !!input.ecsColl,
+    equip: input.equip
+  }, options.chargesRef || null);
+  out.provision = {
+    montant: prov.total, perM2: surf > 0 ? _r2d(prov.total / surf) : 0, perM2Annuel: prov.perM2Annuel,
+    indisponible: prov.indisponible, occupants: prov.occupants, nbLogements: prov.nbLogements,
+    lignes: prov.lignes
+  };
 
   const fia = fiabiliteSegment(rec);
   out.fiabilite = fia;
   const baseWidth = FOURCHETTE_WIDTH[fia.niveau];
 
   // ── ANCRE ANIL (annonce CC − provision estimée) ──
-  const hcAnil = Math.max(0, out.loyerCC - prov.montant);
+  const hcAnil = Math.max(0, out.loyerCC - prov.total);
 
   // ── DÉTECTION D'ABERRATION intra-ANIL : pour une PETITE SURFACE (segment T1-T2), si le €/m² d'annonce
   //    est très supérieur à celui des T3+ de la MÊME commune, l'indicateur petite surface (prime d'annonce,
@@ -422,7 +535,7 @@ export function evaluer(input, record, options = {}) {
     const ratio = (+rec[I_LOY]) / (+record.a3[I_LOY]);
     if (ratio >= RECOUP.aberrA12A3) {
       aberration = true;
-      hcAnilFloor = Math.max(0, Math.round((+record.a3[I_LOY]) * surf) - prov.montant);
+      hcAnilFloor = Math.max(0, Math.round((+record.a3[I_LOY]) * surf) - prov.total);
       hcAnilCentral = Math.round((hcAnil + hcAnilFloor) / 2);
     }
   }
